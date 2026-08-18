@@ -10,6 +10,18 @@ For your own lectures, recordings, narrated tutorials, language practice, and pu
 - **Structure/content separation by design.** Timing data (`deck.json`) and slide text (`content.json`) are separate files; sharing and export features only ever operate on the structure side.
 - Independent implementation — contains no [Audiobookshelf](https://www.audiobookshelf.org/) code and is not affiliated with the Audiobookshelf project.
 
+## Screenshots
+
+*All screenshots show the bundled demo library — every cover, title and audio file is generated from scratch by [`demo/make_demo.py`](demo/make_demo.py).*
+
+![Home — resume card, recently added, series and browse](docs/screenshots/home.png)
+
+<p>
+<img src="docs/screenshots/player.png" width="49%" alt="Player — synchronized slide view with cue-marked scrubber and slide filmstrip">
+<img src="docs/screenshots/book-detail.png" width="49%" alt="Book detail — cover, metadata, tags, description and play actions">
+</p>
+<img src="docs/screenshots/mobile-home.png" width="32%" alt="Home on a phone-sized viewport with bottom tab bar">
+
 ## Quickstart
 
 The bundled demo book (`demo/library/demo-book/`) is already committed, so you can start the
@@ -42,7 +54,7 @@ exposure.
 
 ## Status
 
-Phase 0 (early). Roadmap: library management, auth, progress sync, Docker, PWA, then native mobile apps.
+Phase 1 — library experience (multi-library, search, series/authors/tags, book detail, immersive player) is done. Roadmap: auth, progress sync, Docker, PWA, then native mobile apps.
 
 ## License
 
@@ -61,6 +73,18 @@ Phase 0 (early). Roadmap: library management, auth, progress sync, Docker, PWA, 
 - **self-host 専用。** Python 標準ライブラリのみの小さなサーバがローカルのライブラリを配信します(モバイル Safari のシークに必要な HTTP Range 対応)。データは手元から出ません
 - **構造と本文の分離。** タイミング(`deck.json`)と本文(`content.json`)は別ファイルで、共有・書き出し機能が扱うのは常に構造側だけです
 - 独立実装です — [Audiobookshelf](https://www.audiobookshelf.org/) のコードは含まず、同プロジェクトとは無関係です
+
+## スクリーンショット
+
+*すべて同梱デモライブラリの画面です — 表紙・タイトル・音声はいずれも [`demo/make_demo.py`](demo/make_demo.py) がゼロから生成した自作素材です。*
+
+![ホーム — 続きから・最近追加・シリーズ・ブラウズ](docs/screenshots/home.png)
+
+<p>
+<img src="docs/screenshots/player.png" width="49%" alt="プレイヤー — cue目盛付きシークバーとスライド一覧を備えた同期表示">
+<img src="docs/screenshots/book-detail.png" width="49%" alt="ブック詳細 — カバー・書誌・タグ・説明文と再生操作">
+</p>
+<img src="docs/screenshots/mobile-home.png" width="32%" alt="モバイル幅のホーム(下部タブバー)">
 
 ## 使い方
 

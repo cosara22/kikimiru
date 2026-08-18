@@ -41,6 +41,10 @@ import unicodedata
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "tools" / "release_gate_config.json"
 
+# メディアファイルを置いてよいディレクトリ(いずれも SOURCES.md 出所台帳が必須)。
+# demo/ = 同梱デモ素材、docs/screenshots/ = README掲載用のUIスクリーンショット
+MEDIA_ALLOWED_PREFIXES = ("demo/", "docs/screenshots/")
+
 # 拡張子は判断材料にせず、実データ(マジックバイト)で既知メディアかどうかを判定する
 _FTYP_OFFSET = 4
 
@@ -180,8 +184,12 @@ def main() -> int:
 
         media_kind = detect_media_kind(data)
         if media_kind is not None:
-            if not rel.startswith("demo/"):
-                errors.append(f"{rel}: メディアファイル({media_kind})は demo/ 配下のみ許可")
+            # メディアの置き場所は出所台帳(SOURCES.md)を伴うディレクトリに限定する。
+            # docs/screenshots/ はREADME掲載用のUIスクリーンショット(表示内容は
+            # 自作デモ素材のみ)を置く場所として 2026-08-19 に追加
+            if not any(rel.startswith(pre) for pre in MEDIA_ALLOWED_PREFIXES):
+                allowed = " / ".join(MEDIA_ALLOWED_PREFIXES)
+                errors.append(f"{rel}: メディアファイル({media_kind})は {allowed} 配下のみ許可")
             continue  # メディアの内容自体はテキスト検査しない
 
         text = try_decode_text(data)
@@ -198,9 +206,11 @@ def main() -> int:
         if hits:
             errors.append(f"{rel}: 内容に禁止パターンを検出(長さ{sorted(set(hits))})")
 
-    demo_files = [f for f in files if f.startswith("demo/") and not f.endswith("SOURCES.md")]
-    if demo_files and "demo/SOURCES.md" not in files:
-        errors.append("demo/ に素材があるのに demo/SOURCES.md(出所台帳)がありません")
+    # メディア許可ディレクトリごとに出所台帳(SOURCES.md)の存在を要求する
+    for pre in MEDIA_ALLOWED_PREFIXES:
+        member_files = [f for f in files if f.startswith(pre) and not f.endswith("SOURCES.md")]
+        if member_files and (pre + "SOURCES.md") not in files:
+            errors.append(f"{pre} に素材があるのに {pre}SOURCES.md(出所台帳)がありません")
 
     if warnings:
         print(f"release_gate: 警告 {len(warnings)}件")
