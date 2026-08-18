@@ -1,0 +1,87 @@
+{
+  "kikimiru": 2,
+  "title": "kikimiru の手引き 1 — スキーマの読み方",
+  "authors": [
+    "サンプル・ラボ"
+  ],
+  "narrators": [
+    "合成音サンプルA"
+  ],
+  "series": {
+    "name": "kikimiru の手引き",
+    "sequence": "1"
+  },
+  "tags": [
+    "デモ",
+    "スキーマ",
+    "入門"
+  ],
+  "description": "deck.json と content.json の役割を、デモ音声に合わせて1枚ずつ読み解く手引き。",
+  "cover": "cover.png",
+  "addedAt": "2026-08-17",
+  "audio": {
+    "src": "audio.mp3",
+    "duration": 42.0,
+    "sha256": "7c48c0cb59c0df39e8adf416cffca7e261d43cc3baf6a12e70347ee09d0919d2"
+  },
+  "slides": [
+    {
+      "id": "s1",
+      "kind": "title"
+    },
+    {
+      "id": "s2",
+      "kind": "section"
+    },
+    {
+      "id": "s3",
+      "kind": "content"
+    },
+    {
+      "id": "s4",
+      "kind": "content"
+    },
+    {
+      "id": "s5",
+      "kind": "content"
+    },
+    {
+      "id": "s6",
+      "kind": "content"
+    },
+    {
+      "id": "s7",
+      "kind": "question"
+    }
+  ],
+  "cues": [
+    {
+      "t": 0.0,
+      "slide": "s1"
+    },
+    {
+      "t": 6.0,
+      "slide": "s2"
+    },
+    {
+      "t": 12.0,
+      "slide": "s3"
+    },
+    {
+      "t": 18.0,
+      "slide": "s4"
+    },
+    {
+      "t": 24.0,
+      "slide": "s5"
+    },
+    {
+      "t": 30.0,
+      "slide": "s6"
+    },
+    {
+      "t": 36.0,
+      "slide": "s7"
+    }
+  ]
+}

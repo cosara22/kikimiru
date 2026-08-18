@@ -1,0 +1,67 @@
+{
+  "kikimiru": 2,
+  "title": "デモ素材のつくりかた — 正弦波と図形だけで組む",
+  "authors": [
+    "音の実験室"
+  ],
+  "narrators": [
+    "合成音サンプルB"
+  ],
+  "tags": [
+    "デモ",
+    "音声合成",
+    "ffmpeg"
+  ],
+  "description": "ffmpeg の正弦波と lavfi の図形だけでデモ用ブックを組み立てる手順のメモ。",
+  "cover": "cover.png",
+  "addedAt": "2026-08-19",
+  "audio": {
+    "src": "audio.mp3",
+    "duration": 35.0,
+    "sha256": "f87aca463f4f6d02d2934c45a2969a7f793b9a86c978ce5a95725e6d64f93fee"
+  },
+  "slides": [
+    {
+      "id": "s1",
+      "kind": "title"
+    },
+    {
+      "id": "s2",
+      "kind": "content"
+    },
+    {
+      "id": "s3",
+      "kind": "content"
+    },
+    {
+      "id": "s4",
+      "kind": "content"
+    },
+    {
+      "id": "s5",
+      "kind": "question"
+    }
+  ],
+  "cues": [
+    {
+      "t": 0.0,
+      "slide": "s1"
+    },
+    {
+      "t": 7.0,
+      "slide": "s2"
+    },
+    {
+      "t": 14.0,
+      "slide": "s3"
+    },
+    {
+      "t": 21.0,
+      "slide": "s4"
+    },
+    {
+      "t": 28.0,
+      "slide": "s5"
+    }
+  ]
+}

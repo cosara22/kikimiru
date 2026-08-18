@@ -1,0 +1,95 @@
+{
+  "kikimiru": 2,
+  "title": "kikimiru の手引き 2 — 操作とライブラリ",
+  "authors": [
+    "サンプル・ラボ"
+  ],
+  "narrators": [
+    "合成音サンプルA"
+  ],
+  "series": {
+    "name": "kikimiru の手引き",
+    "sequence": "2"
+  },
+  "tags": [
+    "デモ",
+    "操作",
+    "入門"
+  ],
+  "description": "再生の操作とライブラリ画面の使い方を、デモ音声に合わせて1枚ずつたどる手引き。",
+  "cover": "cover.png",
+  "addedAt": "2026-08-18",
+  "audio": {
+    "src": "audio.mp3",
+    "duration": 40.0,
+    "sha256": "c653335321cb7359f5bf4b84416e0ae83e71277dfa7e3caaacbdef610ae2dfa0"
+  },
+  "slides": [
+    {
+      "id": "s1",
+      "kind": "title"
+    },
+    {
+      "id": "s2",
+      "kind": "section"
+    },
+    {
+      "id": "s3",
+      "kind": "content"
+    },
+    {
+      "id": "s4",
+      "kind": "content"
+    },
+    {
+      "id": "s5",
+      "kind": "section"
+    },
+    {
+      "id": "s6",
+      "kind": "content"
+    },
+    {
+      "id": "s7",
+      "kind": "content"
+    },
+    {
+      "id": "s8",
+      "kind": "question"
+    }
+  ],
+  "cues": [
+    {
+      "t": 0.0,
+      "slide": "s1"
+    },
+    {
+      "t": 5.0,
+      "slide": "s2"
+    },
+    {
+      "t": 10.0,
+      "slide": "s3"
+    },
+    {
+      "t": 15.0,
+      "slide": "s4"
+    },
+    {
+      "t": 20.0,
+      "slide": "s5"
+    },
+    {
+      "t": 25.0,
+      "slide": "s6"
+    },
+    {
+      "t": 30.0,
+      "slide": "s7"
+    },
+    {
+      "t": 35.0,
+      "slide": "s8"
+    }
+  ]
+}

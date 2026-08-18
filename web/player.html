@@ -5,108 +5,214 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>kikimiru</title>
 <style>
-  /* kikimiru player — 単一ファイル・外部CDNなし・ダークテーマ・スマホ縦最適化。
-     ライブラリ(カバーグリッド)+プレイヤーの2画面構成。配色・装飾はkikimiru独自。 */
+  /* kikimiru — 単一ファイル・外部CDNなし・ダークテーマ。
+     デスクトップ=左サイドバー / モバイル=ボトムナビの2ペイン構成。
+     配色・アイコン(自作SVG)・レイアウト実装はすべてkikimiru独自。 */
   :root {
     --bg: #0f1216; --bg2: #151a20; --card: #1a2027; --card-hi: #202834;
     --ink: #e9edf2; --ink2: #98a6b3; --ink3: #6b7885; --line: #28313c;
     --brand: #b39ddb; --brand-deep: #7e6ab8; --brand-dim: #292039;
     --accent-q: #d9a86a; --ok: #79c99e;
     --radius: 14px; --radius-s: 9px;
+    --nav-w: 200px;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
     background: var(--bg); color: var(--ink);
     font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
   }
-  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  body { min-height: 100dvh; }
   button { font-family: inherit; cursor: pointer; }
+  a { color: inherit; }
   :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
-  /* ---- 共通ヘッダ ---- */
+  /* ---- ヘッダ ---- */
   header {
-    position: sticky; top: 0; z-index: 5;
-    background: color-mix(in srgb, var(--bg2) 88%, transparent);
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--bg2) 90%, transparent);
     backdrop-filter: blur(8px);
     border-bottom: 1px solid var(--line);
-    padding: calc(env(safe-area-inset-top) + 10px) 16px 10px;
-    display: flex; align-items: center; gap: 12px;
+    padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
+    display: flex; align-items: center; gap: 10px;
   }
   .logo {
-    font-size: 15px; font-weight: 700; letter-spacing: .04em; color: var(--ink);
-    text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
-    flex-shrink: 0;
+    font-size: 15px; font-weight: 700; letter-spacing: .04em;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 8px; flex-shrink: 0;
   }
   .logo::before {
     content: ""; width: 10px; height: 10px; border-radius: 3px;
     background: linear-gradient(135deg, var(--brand), var(--brand-deep));
-    display: inline-block;
   }
-  header .crumb { font-size: 13px; color: var(--ink2); min-width: 0;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  header .count { margin-left: auto; font-size: 12px; color: var(--ink3); flex-shrink: 0; }
+  #libSel {
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: var(--radius-s); padding: 6px 8px; font-size: 12.5px; max-width: 160px;
+  }
+  #searchForm { flex: 1; display: flex; min-width: 0; }
+  #searchBox {
+    flex: 1; min-width: 0; background: var(--card); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 99px; padding: 7px 14px; font-size: 13px;
+  }
+  #searchBox::placeholder { color: var(--ink3); }
+  #hCount { font-size: 12px; color: var(--ink3); flex-shrink: 0; }
+  @media (max-width: 640px) { #hCount { display: none; } }
 
   #warn { display: none; background: #3a2b12; color: #f0c987; font-size: 12px;
     padding: 7px 16px; border-bottom: 1px solid #57431f; }
 
-  /* ---- ライブラリ(カバーグリッド) ---- */
-  #library { display: none; padding: 18px 16px calc(env(safe-area-inset-bottom) + 24px);
-    max-width: 1080px; margin: 0 auto; width: 100%; }
-  #library .sect { font-size: 12px; letter-spacing: .1em; color: var(--ink3); margin: 2px 2px 12px; }
-  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  /* ---- レイアウト(サイドバー/ボトムナビ) ---- */
+  #shell { display: flex; min-height: calc(100dvh - 50px); }
+  nav#side {
+    width: var(--nav-w); flex-shrink: 0; padding: 14px 10px;
+    border-right: 1px solid var(--line);
+    position: sticky; top: 50px; align-self: flex-start;
+    height: calc(100dvh - 50px); overflow-y: auto;
+  }
+  .navitem {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    padding: 9px 12px; border-radius: var(--radius-s); text-decoration: none;
+    color: var(--ink2); font-size: 13.5px; margin-bottom: 2px;
+  }
+  .navitem svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .navitem:hover { background: var(--card); color: var(--ink); }
+  .navitem.cur { background: var(--brand-dim); color: var(--brand); }
+  #content { flex: 1; min-width: 0; padding: 18px 18px calc(env(safe-area-inset-bottom) + 24px); max-width: 1100px; }
+
+  nav#bottom { display: none; }
+  @media (max-width: 760px) {
+    nav#side { display: none; }
+    #content { padding-bottom: calc(env(safe-area-inset-bottom) + 76px); }
+    nav#bottom {
+      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 10;
+      background: color-mix(in srgb, var(--bg2) 94%, transparent);
+      backdrop-filter: blur(8px); border-top: 1px solid var(--line);
+      padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px);
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    nav#bottom .navitem {
+      flex-direction: column; gap: 3px; font-size: 10px; padding: 6px 10px;
+      flex: 1 0 auto; min-width: 56px; text-align: center; margin: 0;
+    }
+    nav#bottom .navitem svg { width: 20px; height: 20px; }
+  }
+
+  /* ---- 見出し・ツールバー ---- */
+  .sect { font-size: 12px; letter-spacing: .1em; color: var(--ink3); margin: 4px 2px 12px; }
+  .sect-row { display: flex; align-items: baseline; gap: 10px; margin: 4px 2px 12px; }
+  .sect-row .sect { margin: 0; }
+  .sect-row .more { margin-left: auto; font-size: 12px; color: var(--brand); text-decoration: none; }
+  .toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar select {
+    background: var(--card); color: var(--ink); border: 1px solid var(--line);
+    border-radius: var(--radius-s); padding: 6px 8px; font-size: 12.5px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+    background: var(--brand-dim); color: var(--brand); border: 1px solid var(--brand-deep);
+    border-radius: 99px; padding: 4px 12px; text-decoration: none;
+  }
+  .empty { color: var(--ink2); font-size: 13.5px; padding: 18px 4px; }
+
+  /* ---- ブックカード ---- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
+  .grid.small { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 12px; }
   .bcard {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
-    overflow: hidden; text-decoration: none; color: var(--ink); display: flex;
-    flex-direction: column; transition: transform .15s ease, border-color .15s ease;
+    overflow: hidden; text-decoration: none; display: flex; flex-direction: column;
+    transition: transform .15s ease, border-color .15s ease;
   }
   .bcard:hover { transform: translateY(-2px); border-color: var(--brand-deep); }
   .cov { position: relative; aspect-ratio: 1; background: var(--card-hi); }
   .cov img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .cov .ph {
     width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
-    font-size: 44px; font-weight: 700; color: rgba(255,255,255,.85);
+    font-size: 42px; font-weight: 700; color: rgba(255,255,255,.85);
     text-shadow: 0 2px 10px rgba(0,0,0,.35);
   }
   .cov .badge {
     position: absolute; right: 8px; bottom: 8px; font-size: 10px; padding: 3px 7px;
-    border-radius: 99px; background: rgba(0,0,0,.55); color: #dfe6ee;
-    backdrop-filter: blur(4px);
+    border-radius: 99px; background: rgba(0,0,0,.55); color: #dfe6ee; backdrop-filter: blur(4px);
+  }
+  .cov .seq {
+    position: absolute; left: 8px; top: 8px; font-size: 10.5px; padding: 3px 8px;
+    border-radius: 99px; background: rgba(0,0,0,.55); color: var(--brand); backdrop-filter: blur(4px);
   }
   .pbar { height: 3px; background: var(--line); }
   .pbar > i { display: block; height: 100%; background: var(--brand); }
-  .binfo { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 4px; }
+  .binfo { padding: 10px 12px 12px; display: flex; flex-direction: column; gap: 3px; }
   .binfo .t { font-size: 13.5px; font-weight: 600; line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .binfo .m { font-size: 11.5px; color: var(--ink2); }
+  .binfo .a { font-size: 11.5px; color: var(--ink2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .binfo .m { font-size: 11px; color: var(--ink3); }
   .binfo .resume { font-size: 11px; color: var(--brand); }
-  #libEmpty { color: var(--ink2); font-size: 14px; padding: 24px 4px; }
+
+  /* ---- 名前カード(著者・話者・シリーズ) ---- */
+  .plist { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+  .pcard {
+    display: flex; align-items: center; gap: 12px; background: var(--card);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px;
+    text-decoration: none; transition: border-color .15s ease;
+  }
+  .pcard:hover { border-color: var(--brand-deep); }
+  .pcard .thumb {
+    width: 46px; height: 46px; border-radius: var(--radius-s); flex-shrink: 0;
+    background: var(--card-hi); overflow: hidden; display: flex;
+    align-items: center; justify-content: center; font-size: 18px; font-weight: 700;
+    color: rgba(255,255,255,.8);
+  }
+  .pcard .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pcard .nm { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
+  .pcard .ct { font-size: 11.5px; color: var(--ink3); margin-top: 2px; }
+
+  /* ---- 統計タイル ---- */
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .stile {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 14px 16px;
+  }
+  .stile .v { font-size: 22px; font-weight: 700; color: var(--brand); font-variant-numeric: tabular-nums; }
+  .stile .l { font-size: 11.5px; color: var(--ink2); margin-top: 3px; }
+
+  /* ---- コレクション ---- */
+  .colhead { display: flex; align-items: center; gap: 10px; margin: 18px 2px 10px; }
+  .colhead .nm { font-size: 15px; font-weight: 700; }
+  .colhead .ct { font-size: 11.5px; color: var(--ink3); }
+  .colhead .ops { margin-left: auto; display: flex; gap: 6px; }
+  .btn {
+    background: var(--card); color: var(--ink2); border: 1px solid var(--line);
+    border-radius: var(--radius-s); padding: 7px 14px; font-size: 12.5px;
+  }
+  .btn:hover { color: var(--ink); border-color: var(--brand-deep); }
+  .btn.primary { background: var(--brand-dim); border-color: var(--brand-deep); color: var(--brand); }
+  .picker {
+    background: var(--bg2); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 12px; margin: 8px 0 16px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .picker label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 2px; }
+  .picker .ops { display: flex; gap: 8px; margin-top: 8px; }
 
   /* ---- プレイヤー ---- */
-  #main { display: none; flex: 1; padding: 14px 16px calc(env(safe-area-inset-bottom) + 18px);
-    max-width: 1080px; margin: 0 auto; width: 100%;
-    grid-template-columns: 1fr; gap: 14px; }
-  #main.show { display: grid; }
+  #player { display: grid; grid-template-columns: 1fr; gap: 14px; }
   @media (min-width: 920px) {
-    #main.show { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
-    #paneList { position: sticky; top: 76px; }
+    #player { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+    #paneList { position: sticky; top: 66px; }
   }
   #paneMain { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
-
+  .crumbs { font-size: 12.5px; color: var(--ink3); display: flex; gap: 6px; align-items: center; }
+  .crumbs a { color: var(--ink2); text-decoration: none; }
+  .crumbs a:hover { color: var(--brand); }
   #slide {
     background: linear-gradient(180deg, var(--card) 0%, var(--bg2) 130%);
     border: 1px solid var(--line); border-radius: var(--radius);
     padding: 26px 22px; min-height: 40dvh;
     display: flex; flex-direction: column; justify-content: center; gap: 14px;
-    animation: none;
   }
   #slide.flip { animation: slidein .28s ease; }
   @keyframes slidein { from { opacity: .35; transform: translateY(5px); } to { opacity: 1; transform: none; } }
-  #slide .kind {
-    font-size: 11px; letter-spacing: .14em; color: var(--brand);
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  #slide .kind::before { content: ""; width: 14px; height: 2px; background: var(--brand); display: inline-block; }
-  #slide h2 { font-size: 21px; line-height: 1.45; letter-spacing: .01em; }
+  #slide .kind { font-size: 11px; letter-spacing: .14em; color: var(--brand);
+    display: inline-flex; align-items: center; gap: 6px; }
+  #slide .kind::before { content: ""; width: 14px; height: 2px; background: var(--brand); }
+  #slide h2 { font-size: 21px; line-height: 1.45; }
   #slide ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
   #slide ul li { padding-left: 1.1em; text-indent: -1.1em; font-size: 15px; line-height: 1.6; }
   #slide ul li::before { content: "— "; color: var(--brand); }
@@ -120,10 +226,8 @@
   #slide.kind-question .kind { color: var(--accent-q); }
   #slide.kind-question .kind::before { background: var(--accent-q); }
   #slide.kind-question ul li::before { content: "? "; color: var(--accent-q); }
-
   .meter { display: flex; justify-content: space-between; font-size: 12px;
     color: var(--ink2); padding: 0 4px; font-variant-numeric: tabular-nums; }
-
   #controls { display: flex; flex-direction: column; gap: 10px;
     background: var(--bg2); border: 1px solid var(--line);
     border-radius: var(--radius); padding: 12px; }
@@ -132,26 +236,21 @@
   .row button {
     flex: 1; background: var(--card); color: var(--ink2); border: 1px solid var(--line);
     border-radius: var(--radius-s); padding: 10px 0; font-size: 13px;
-    transition: background .12s ease, color .12s ease, border-color .12s ease;
   }
   .row button:hover { color: var(--ink); border-color: var(--brand-deep); }
   .row button.on { background: var(--brand-dim); border-color: var(--brand); color: var(--brand); }
-  .row button:active { transform: translateY(1px); }
   #resume {
     display: none; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink2);
     background: var(--brand-dim); border: 1px solid var(--brand-deep);
     border-radius: var(--radius-s); padding: 9px 12px;
   }
-  #resume b { color: var(--brand); font-weight: 600; }
-  #resume button { margin-left: auto; background: none; border: none; color: var(--ink3);
-    font-size: 14px; padding: 0 4px; }
-
-  /* ---- スライド一覧 ---- */
+  #resume b { color: var(--brand); }
+  #resume button { margin-left: auto; background: none; border: none; color: var(--ink3); font-size: 14px; }
   #paneList { background: var(--bg2); border: 1px solid var(--line);
-    border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; min-width: 0; }
+    border-radius: var(--radius); padding: 10px; min-width: 0; }
   #paneList .head { font-size: 11.5px; letter-spacing: .08em; color: var(--ink3); margin: 4px 6px 8px; }
   #list { display: flex; flex-direction: column; gap: 2px; max-height: 46dvh; overflow-y: auto; }
-  @media (min-width: 920px) { #list { max-height: calc(100dvh - 200px); } }
+  @media (min-width: 920px) { #list { max-height: calc(100dvh - 190px); } }
   #list .item {
     display: flex; gap: 10px; align-items: baseline; background: none;
     border: 1px solid transparent; border-radius: var(--radius-s); padding: 8px 10px;
@@ -159,8 +258,7 @@
   }
   #list .item:hover { background: var(--card); color: var(--ink); }
   #list .item .n { font-size: 11px; color: var(--ink3); min-width: 1.6em; text-align: right; }
-  #list .item .t { font-variant-numeric: tabular-nums; font-size: 11.5px;
-    color: var(--ink3); min-width: 3.2em; }
+  #list .item .t { font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--ink3); min-width: 3.2em; }
   #list .item .ttl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #list .item.cur { background: var(--brand-dim); border-color: var(--brand-deep); color: var(--ink); }
   #list .item.cur .t, #list .item.cur .n { color: var(--brand); }
@@ -168,46 +266,42 @@
 </head>
 <body>
 <header>
-  <a class="logo" href="?">kikimiru</a>
-  <span class="crumb" id="crumb"></span>
-  <span class="count" id="hCount"></span>
+  <a class="logo" id="logoLink" href="?">kikimiru</a>
+  <select id="libSel" aria-label="ライブラリ選択"></select>
+  <form id="searchForm"><input id="searchBox" type="search" placeholder="検索…" aria-label="検索"></form>
+  <span id="hCount"></span>
 </header>
 <div id="warn" role="status"></div>
 
-<section id="library">
-  <div class="sect">ライブラリ</div>
-  <div id="grid"></div>
-  <div id="libEmpty" hidden>ライブラリにブックがありません。<code>--library</code> でブックフォルダを指定してください。</div>
-</section>
-
-<main id="main">
-  <div id="paneMain">
-    <section id="slide" aria-live="polite"></section>
-    <div class="meter"><span id="mSlide"></span><span id="mTime"></span></div>
-    <div id="resume"><span>前回の続き <b id="resumeAt"></b> から再開します</span><button id="resumeOff" type="button" aria-label="最初から再生">×</button></div>
-    <div id="controls">
-      <audio id="audio" controls preload="metadata"></audio>
-      <div class="row" id="speeds"></div>
-      <div class="row">
-        <button id="prev" type="button">◀ 前のスライド</button>
-        <button id="next" type="button">次のスライド ▶</button>
-      </div>
-    </div>
-  </div>
-  <nav id="paneList">
-    <div class="head">スライド一覧(タップで移動)</div>
-    <div id="list"></div>
-  </nav>
-</main>
+<div id="shell">
+  <nav id="side" aria-label="メインナビゲーション"></nav>
+  <div id="content"></div>
+</div>
+<nav id="bottom" aria-label="メインナビゲーション(モバイル)"></nav>
 
 <script>
 (function () {
   "use strict";
-  var book = new URLSearchParams(location.search).get("book");
+
+  // ================= 共通ユーティリティ =================
+  var params = new URLSearchParams(location.search);
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
 
   function fmt(sec) {
     sec = Math.max(0, Math.floor(sec));
     return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  }
+
+  function fmtLong(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    var h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return h > 0 ? h + "時間" + m + "分" : m + "分" + (sec % 60) + "秒";
   }
 
   // #warn へ警告文を積み上げて表示する(複数件出ても既存メッセージを消さない)
@@ -225,21 +319,22 @@
 
   // スライド種別のallowlist(deck.json由来の値をCSSクラス名へ直接注入しない)
   var ALLOWED_KINDS = ["title", "section", "content", "question"];
-  function safeKind(k) {
-    return ALLOWED_KINDS.indexOf(k) !== -1 ? k : "content";
-  }
+  function safeKind(k) { return ALLOWED_KINDS.indexOf(k) !== -1 ? k : "content"; }
 
-  // 再生位置の保存(localStorageはSafariプライベートモード等で例外を投げるためtry/catchで包む)
-  function loadPos(id) {
-    try {
-      var raw = localStorage.getItem("kikimiru.pos." + id);
-      return raw ? JSON.parse(raw) : null;
-    } catch (e) { return null; }
+  // localStorage(Safariプライベートモード等で例外を投げるためtry/catchで包む)
+  function lsGet(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
   }
-  function savePos(id, t, d) {
-    try {
-      localStorage.setItem("kikimiru.pos." + id, JSON.stringify({ t: t, d: d, at: Date.now() }));
-    } catch (e) { /* 保存できない環境では黙って続行 */ }
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) { /* 保存不可環境では黙って続行 */ }
+  }
+  function loadPos(lib, id) {
+    var raw = lsGet("kikimiru.pos." + lib + "/" + id);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+  function savePos(lib, id, t, d) {
+    lsSet("kikimiru.pos." + lib + "/" + id, JSON.stringify({ t: t, d: d, at: Date.now() }));
   }
 
   // ブックIDからプレースホルダカバーの色相を決める(決定論・依存なし)
@@ -249,264 +344,716 @@
     return h % 360;
   }
 
-  // ================= ライブラリ画面 =================
-  if (!book) {
-    document.getElementById("library").style.display = "block";
-    document.getElementById("crumb").textContent = "";
-    fetch("/api/books").then(function (r) { return r.json(); }).then(function (d) {
-      var grid = document.getElementById("grid");
-      document.getElementById("hCount").textContent = d.books.length + " ブック";
+  function qs(overrides) {
+    // 現在のライブラリ選択を維持したままクエリ文字列を組み立てる
+    var p = new URLSearchParams();
+    if (state.lib) p.set("library", state.lib);
+    Object.keys(overrides || {}).forEach(function (k) {
+      if (overrides[k] != null && overrides[k] !== "") p.set(k, overrides[k]);
+    });
+    return "?" + p.toString();
+  }
+
+  function api(path, extra) {
+    var p = new URLSearchParams(extra || {});
+    if (state.lib) p.set("library", state.lib);
+    return fetch(path + "?" + p.toString()).then(function (r) {
+      if (!r.ok) throw new Error(path + " " + r.status);
+      return r.json();
+    });
+  }
+
+  function bookBase(lib, id) {
+    return "/books/" + encodeURIComponent(lib) + "/" + encodeURIComponent(id) + "/";
+  }
+
+  // ================= 自作SVGアイコン(静的文字列のみ) =================
+  var ICONS = {
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/><path d="M10 20v-5.5h4V20"/></svg>',
+    library: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>',
+    series: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="3.5" width="13" height="13" rx="2"/><path d="M4 8v10.5A2.5 2.5 0 0 0 6.5 21H17"/></svg>',
+    collections: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h3l2 2.5h5A2.5 2.5 0 0 1 19 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-10A2.5 2.5 0 0 1 4 17.5z"/></svg>',
+    authors: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1.2-3.4 3.9-5 7-5s5.8 1.6 7 5"/></svg>',
+    narrators: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3.5" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><path d="M12 18v2.5"/></svg>',
+    stats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 20V13"/><path d="M12 20V5.5"/><path d="M19 20v-9.5"/></svg>'
+  };
+
+  var NAV = [
+    { view: "home", label: "ホーム", icon: "home" },
+    { view: "library", label: "本棚", icon: "library" },
+    { view: "series", label: "シリーズ", icon: "series" },
+    { view: "collections", label: "コレクション", icon: "collections" },
+    { view: "authors", label: "著者", icon: "authors" },
+    { view: "narrators", label: "話者", icon: "narrators" },
+    { view: "stats", label: "統計", icon: "stats" }
+  ];
+
+  // ================= 状態 =================
+  var state = {
+    lib: params.get("library") || lsGet("kikimiru.lib") || "",
+    view: params.get("view") || (params.get("book") ? "player" : "home")
+  };
+
+  // ================= シェル(ヘッダ・ナビ) =================
+  function renderNav() {
+    ["side", "bottom"].forEach(function (navId) {
+      var nav = document.getElementById(navId);
+      nav.textContent = "";
+      NAV.forEach(function (item) {
+        var a = document.createElement("a");
+        a.className = "navitem" + (state.view === item.view ? " cur" : "");
+        a.href = qs({ view: item.view });
+        a.innerHTML = ICONS[item.icon];  // 静的なSVG文字列のみ(外部データを混ぜない)
+        a.appendChild(el("span", null, item.label));
+        nav.appendChild(a);
+      });
+    });
+    document.getElementById("logoLink").href = qs({ view: "home" });
+  }
+
+  function initHeader(libs) {
+    var sel = document.getElementById("libSel");
+    sel.textContent = "";
+    libs.forEach(function (l) {
+      var opt = document.createElement("option");
+      opt.value = l.id;
+      opt.textContent = l.name + " (" + l.books + ")";
+      if (l.id === state.lib) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.addEventListener("change", function () {
+      lsSet("kikimiru.lib", sel.value);
+      var p = new URLSearchParams();
+      p.set("library", sel.value);
+      p.set("view", state.view === "player" ? "home" : state.view);
+      location.search = "?" + p.toString();
+    });
+    // ライブラリが1つだけなら選択UIを隠してすっきりさせる
+    if (libs.length <= 1) sel.style.display = "none";
+
+    var form = document.getElementById("searchForm");
+    var box = document.getElementById("searchBox");
+    box.value = params.get("q") || "";
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      location.search = qs({ view: "library", q: box.value.trim() });
+    });
+  }
+
+  // ================= ブックカード部品 =================
+  function coverInto(container, lib, bookId, coverName, title) {
+    var hue = hueOf(bookId);
+    var ph = el("div", "ph", (title || bookId).charAt(0));
+    ph.style.background = "linear-gradient(135deg, hsl(" + hue + ",42%,30%), hsl(" + ((hue + 45) % 360) + ",48%,16%))";
+    container.appendChild(ph);
+    if (coverName) {
+      // 注意: loading="lazy" をDOM未接続のimgに付けるとChromiumはロードを開始しない
+      // (loadが永久に発火せず差し替えが起きない)。imgは即座にDOMへ入れ、
+      // ロード完了までopacityで隠す方式にする(display:noneもlazyのロードを止めるため不可)。
+      var img = document.createElement("img");
+      img.alt = "";
+      img.style.opacity = "0";
+      img.style.position = "absolute";
+      img.style.inset = "0";
+      img.addEventListener("load", function () {
+        ph.remove();
+        img.style.opacity = "";
+        img.style.position = "";
+      });
+      img.addEventListener("error", function () { img.remove(); });
+      img.src = bookBase(lib, bookId) + encodeURIComponent(coverName);
+      container.appendChild(img);
+    }
+  }
+
+  function bookCard(b, opts) {
+    opts = opts || {};
+    var a = document.createElement("a");
+    a.className = "bcard";
+    a.href = qs({ book: b.id });
+
+    var cov = el("div", "cov");
+    coverInto(cov, b.library, b.id, b.cover, b.title);
+    if (b.duration) cov.appendChild(el("span", "badge", fmt(b.duration)));
+    if (opts.showSeq && b.series && b.series.sequence) {
+      cov.appendChild(el("span", "seq", "#" + b.series.sequence));
+    }
+    a.appendChild(cov);
+
+    var pos = loadPos(b.library, b.id);
+    var pct = (pos && pos.d > 0) ? Math.min(100, Math.round(pos.t / pos.d * 100)) : 0;
+    var pbar = el("div", "pbar");
+    var fill = document.createElement("i");
+    fill.style.width = pct + "%";
+    pbar.appendChild(fill);
+    a.appendChild(pbar);
+
+    var info = el("div", "binfo");
+    info.appendChild(el("div", "t", b.title));
+    if (b.authors && b.authors.length) info.appendChild(el("div", "a", b.authors.join(" / ")));
+    info.appendChild(el("div", "m", b.slides + "枚のスライド"));
+    if (pct > 0 && pct < 100) info.appendChild(el("div", "resume", "再生途中 " + pct + "%"));
+    a.appendChild(info);
+    return a;
+  }
+
+  function personCard(p, targetKey) {
+    var a = document.createElement("a");
+    a.className = "pcard";
+    var q = { view: "library" };
+    q[targetKey] = p.name;
+    a.href = qs(q);
+    var thumb = el("div", "thumb");
+    function thumbFallback() {
+      thumb.textContent = p.name.charAt(0);
+      var hue = hueOf(p.name);
+      thumb.style.background = "linear-gradient(135deg, hsl(" + hue + ",40%,32%), hsl(" + ((hue + 45) % 360) + ",45%,18%))";
+    }
+    if (p.sample && p.sample.cover) {
+      var img = document.createElement("img");
+      img.alt = "";
+      img.addEventListener("error", function () { img.remove(); thumbFallback(); });
+      img.src = bookBase(state.lib, p.sample.book) + encodeURIComponent(p.sample.cover);
+      thumb.appendChild(img);
+    } else {
+      thumbFallback();
+    }
+    a.appendChild(thumb);
+    var box = el("div");
+    box.appendChild(el("div", "nm", p.name));
+    box.appendChild(el("div", "ct", p.books + "冊"));
+    a.appendChild(box);
+    return a;
+  }
+
+  // ================= 各画面 =================
+  var content = document.getElementById("content");
+
+  function setCount(text) { document.getElementById("hCount").textContent = text; }
+
+  function viewHome() {
+    api("/api/books", { sort: "added" }).then(function (d) {
+      setCount(d.books.length + " ブック");
+      content.textContent = "";
+
+      // 「続きから」 — 進捗が5〜97%のブックを、最後に聴いた順で
+      var inProgress = d.books.map(function (b) {
+        var pos = loadPos(b.library, b.id);
+        var pct = (pos && pos.d > 0) ? pos.t / pos.d : 0;
+        return { book: b, pos: pos, pct: pct };
+      }).filter(function (x) {
+        return x.pos && x.pct >= 0.02 && x.pct <= 0.97;
+      }).sort(function (a, b) { return (b.pos.at || 0) - (a.pos.at || 0); });
+
+      if (inProgress.length) {
+        content.appendChild(el("div", "sect", "続きから"));
+        var g1 = el("div", "grid small");
+        inProgress.slice(0, 6).forEach(function (x) { g1.appendChild(bookCard(x.book)); });
+        content.appendChild(g1);
+      }
+
+      var row = el("div", "sect-row");
+      row.appendChild(el("div", "sect", "最近追加した本"));
+      var more = document.createElement("a");
+      more.className = "more";
+      more.href = qs({ view: "library" });
+      more.textContent = "すべて見る →";
+      row.appendChild(more);
+      content.appendChild(row);
       if (!d.books.length) {
-        document.getElementById("libEmpty").hidden = false;
+        content.appendChild(el("div", "empty", "ライブラリにブックがありません。--library でブックフォルダを指定してください。"));
         return;
       }
-      d.books.forEach(function (b) {
-        var a = document.createElement("a");
-        a.className = "bcard";
-        a.href = "?book=" + encodeURIComponent(b.id);
+      var g2 = el("div", "grid");
+      d.books.slice(0, 12).forEach(function (b) { g2.appendChild(bookCard(b)); });
+      content.appendChild(g2);
 
-        var cov = document.createElement("div");
-        cov.className = "cov";
-        // プレースホルダ(タイトル先頭文字+ブックID由来の色相グラデーション)
-        var hue = hueOf(b.id);
-        var ph = document.createElement("div");
-        ph.className = "ph";
-        ph.style.background = "linear-gradient(135deg, hsl(" + hue + ",42%,30%), hsl(" + ((hue + 45) % 360) + ",48%,16%))";
-        ph.textContent = (b.title || b.id).charAt(0);
-        cov.appendChild(ph);
-        // cover.jpg があれば差し替える(無ければ404でonerror→プレースホルダのまま)
-        var img = document.createElement("img");
-        img.loading = "lazy";
-        img.alt = "";
-        img.addEventListener("load", function () { ph.replaceWith(img); });
-        img.src = "/books/" + encodeURIComponent(b.id) + "/cover.jpg";
-        if (b.duration) {
-          var badge = document.createElement("span");
-          badge.className = "badge";
-          badge.textContent = fmt(b.duration);
-          cov.appendChild(badge);
-        }
-        a.appendChild(cov);
-
-        // 進捗バー(保存済みの再生位置から)
-        var pos = loadPos(b.id);
-        var pct = (pos && pos.d > 0) ? Math.min(100, Math.round(pos.t / pos.d * 100)) : 0;
-        var pbar = document.createElement("div");
-        pbar.className = "pbar";
-        var fill = document.createElement("i");
-        fill.style.width = pct + "%";
-        pbar.appendChild(fill);
-        a.appendChild(pbar);
-
-        var info = document.createElement("div");
-        info.className = "binfo";
-        var t = document.createElement("div");
-        t.className = "t";
-        t.textContent = b.title;
-        info.appendChild(t);
-        var m = document.createElement("div");
-        m.className = "m";
-        m.textContent = b.slides + "枚のスライド";
-        info.appendChild(m);
-        if (pct > 0 && pct < 100) {
-          var rs = document.createElement("div");
-          rs.className = "resume";
-          rs.textContent = "再生途中 " + pct + "%";
-          info.appendChild(rs);
-        }
-        a.appendChild(info);
-        grid.appendChild(a);
+      return api("/api/series").then(function (s) {
+        if (!s.series.length) return;
+        var row2 = el("div", "sect-row");
+        row2.style.marginTop = "22px";
+        row2.appendChild(el("div", "sect", "シリーズ"));
+        var more2 = document.createElement("a");
+        more2.className = "more";
+        more2.href = qs({ view: "series" });
+        more2.textContent = "すべて見る →";
+        row2.appendChild(more2);
+        content.appendChild(row2);
+        var pl = el("div", "plist");
+        s.series.slice(0, 4).forEach(function (g) { pl.appendChild(personCard(g, "series")); });
+        content.appendChild(pl);
       });
-    }).catch(function () {
-      document.getElementById("libEmpty").hidden = false;
-      document.getElementById("libEmpty").textContent = "サーバに接続できません。";
+    }).catch(function (e) { showError(e); });
+  }
+
+  function viewLibrary() {
+    var extra = {};
+    ["q", "author", "narrator", "series", "tag"].forEach(function (k) {
+      if (params.get(k)) extra[k] = params.get(k);
     });
-    return;
+    extra.sort = params.get("sort") || (extra.series ? "series" : "title");
+    api("/api/books", extra).then(function (d) {
+      setCount(d.books.length + " ブック");
+      content.textContent = "";
+
+      var bar = el("div", "toolbar");
+      // 絞り込み中の表示(チップ)。タップで解除して本棚全体へ
+      ["q", "author", "narrator", "series", "tag"].forEach(function (k) {
+        if (!extra[k]) return;
+        var chip = document.createElement("a");
+        chip.className = "chip";
+        chip.href = qs({ view: "library" });
+        var label = { q: "検索", author: "著者", narrator: "話者", series: "シリーズ", tag: "タグ" }[k];
+        chip.textContent = label + ": " + extra[k] + " ✕";
+        bar.appendChild(chip);
+      });
+      var sortSel = document.createElement("select");
+      sortSel.setAttribute("aria-label", "並び替え");
+      [["title", "タイトル順"], ["added", "追加日順"], ["duration", "長さ順"], ["series", "シリーズ順"]].forEach(function (o) {
+        var opt = document.createElement("option");
+        opt.value = o[0];
+        opt.textContent = o[1];
+        if (extra.sort === o[0]) opt.selected = true;
+        sortSel.appendChild(opt);
+      });
+      sortSel.addEventListener("change", function () {
+        var q = { view: "library", sort: sortSel.value };
+        ["q", "author", "narrator", "series", "tag"].forEach(function (k) { if (extra[k]) q[k] = extra[k]; });
+        location.search = qs(q);
+      });
+      bar.appendChild(sortSel);
+      content.appendChild(bar);
+
+      if (!d.books.length) {
+        content.appendChild(el("div", "empty", "該当するブックがありません。"));
+        return;
+      }
+      var g = el("div", "grid");
+      d.books.forEach(function (b) { g.appendChild(bookCard(b, { showSeq: !!extra.series })); });
+      content.appendChild(g);
+    }).catch(function (e) { showError(e); });
+  }
+
+  function viewSeries() {
+    api("/api/series").then(function (d) {
+      setCount(d.series.length + " シリーズ");
+      content.textContent = "";
+      content.appendChild(el("div", "sect", "シリーズ"));
+      if (!d.series.length) {
+        content.appendChild(el("div", "empty", "シリーズが設定されたブックがありません(deck.json の series フィールドで設定できます)。"));
+        return;
+      }
+      var pl = el("div", "plist");
+      d.series.forEach(function (g) {
+        var card = personCard(g, "series");
+        card.querySelector(".ct").textContent = g.books + "冊 / " + fmtLong(g.duration);
+        pl.appendChild(card);
+      });
+      content.appendChild(pl);
+    }).catch(function (e) { showError(e); });
+  }
+
+  function viewPeople(kind) {
+    var apiPath = kind === "authors" ? "/api/authors" : "/api/narrators";
+    var label = kind === "authors" ? "著者" : "話者";
+    var targetKey = kind === "authors" ? "author" : "narrator";
+    api(apiPath).then(function (d) {
+      var people = d[kind];
+      setCount(people.length + " 名");
+      content.textContent = "";
+      content.appendChild(el("div", "sect", label));
+      if (!people.length) {
+        content.appendChild(el("div", "empty", label + "が設定されたブックがありません(deck.json の " + kind + " フィールドで設定できます)。"));
+        return;
+      }
+      var pl = el("div", "plist");
+      people.forEach(function (p) { pl.appendChild(personCard(p, targetKey)); });
+      content.appendChild(pl);
+    }).catch(function (e) { showError(e); });
+  }
+
+  function viewStats() {
+    Promise.all([api("/api/stats"), api("/api/books")]).then(function (res) {
+      var s = res[0].stats;
+      var books = res[1].books;
+      setCount(s.books + " ブック");
+      content.textContent = "";
+      content.appendChild(el("div", "sect", "ライブラリの統計"));
+
+      // 端末ローカルの進捗から聴取状況を算出(進捗はこの端末にのみ保存されている)
+      var done = 0, listening = 0;
+      books.forEach(function (b) {
+        var pos = loadPos(b.library, b.id);
+        if (!pos || !pos.d) return;
+        var pct = pos.t / pos.d;
+        if (pct > 0.97) done++;
+        else if (pct >= 0.02) listening++;
+      });
+
+      var tiles = [
+        [String(s.books), "ブック"],
+        [fmtLong(s.duration), "総再生時間"],
+        [String(s.slides), "スライド総数"],
+        [String(s.authors), "著者"],
+        [String(s.narrators), "話者"],
+        [String(s.series), "シリーズ"],
+        [String(done), "聴き終えた(この端末)"],
+        [String(listening), "聴いている途中(この端末)"]
+      ];
+      var grid = el("div", "stats");
+      tiles.forEach(function (t) {
+        var tile = el("div", "stile");
+        tile.appendChild(el("div", "v", t[0]));
+        tile.appendChild(el("div", "l", t[1]));
+        grid.appendChild(tile);
+      });
+      content.appendChild(grid);
+    }).catch(function (e) { showError(e); });
+  }
+
+  function viewCollections() {
+    Promise.all([api("/api/collections"), api("/api/books")]).then(function (res) {
+      var collections = res[0].collections;
+      var books = res[1].books;
+      var byId = Object.create(null);
+      books.forEach(function (b) { byId[b.id] = b; });
+      setCount(collections.length + " コレクション");
+      content.textContent = "";
+
+      var bar = el("div", "toolbar");
+      var addBtn = el("button", "btn primary", "＋ 新しいコレクション");
+      addBtn.type = "button";
+      addBtn.addEventListener("click", function () {
+        var name = prompt("コレクション名を入力してください");
+        if (!name || !name.trim()) return;
+        collections.push({ name: name.trim(), books: [] });
+        putCollections(collections);
+      });
+      bar.appendChild(addBtn);
+      content.appendChild(bar);
+
+      if (!collections.length) {
+        content.appendChild(el("div", "empty", "コレクションはまだありません。「＋ 新しいコレクション」から作成できます。"));
+        return;
+      }
+
+      collections.forEach(function (c, idx) {
+        var head = el("div", "colhead");
+        head.appendChild(el("span", "nm", c.name));
+        head.appendChild(el("span", "ct", c.books.length + "冊"));
+        var ops = el("div", "ops");
+        var editBtn = el("button", "btn", "ブックを追加/編集");
+        editBtn.type = "button";
+        var delBtn = el("button", "btn", "削除");
+        delBtn.type = "button";
+        delBtn.addEventListener("click", function () {
+          if (!confirm("コレクション「" + c.name + "」を削除しますか?")) return;
+          collections.splice(idx, 1);
+          putCollections(collections);
+        });
+        ops.appendChild(editBtn);
+        ops.appendChild(delBtn);
+        head.appendChild(ops);
+        content.appendChild(head);
+
+        var grid = el("div", "grid small");
+        var member = c.books.map(function (id) { return byId[id]; }).filter(Boolean);
+        if (member.length) {
+          member.forEach(function (b) { grid.appendChild(bookCard(b)); });
+          content.appendChild(grid);
+        } else {
+          content.appendChild(el("div", "empty", "まだブックがありません。"));
+        }
+
+        // 編集パネル(チェックボックスで所属ブックを選ぶ)
+        editBtn.addEventListener("click", function () {
+          if (head.nextElementSibling && head.nextElementSibling.classList.contains("picker")) return;
+          var picker = el("div", "picker");
+          var checks = [];
+          books.forEach(function (b) {
+            var label = document.createElement("label");
+            var cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.checked = c.books.indexOf(b.id) !== -1;
+            checks.push([cb, b.id]);
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(b.title));
+            picker.appendChild(label);
+          });
+          var ops2 = el("div", "ops");
+          var save = el("button", "btn primary", "保存");
+          save.type = "button";
+          save.addEventListener("click", function () {
+            c.books = checks.filter(function (x) { return x[0].checked; }).map(function (x) { return x[1]; });
+            putCollections(collections);
+          });
+          var cancel = el("button", "btn", "キャンセル");
+          cancel.type = "button";
+          cancel.addEventListener("click", function () { picker.remove(); });
+          ops2.appendChild(save);
+          ops2.appendChild(cancel);
+          picker.appendChild(ops2);
+          head.after(picker);
+        });
+      });
+    }).catch(function (e) { showError(e); });
+  }
+
+  function putCollections(collections) {
+    var p = new URLSearchParams();
+    if (state.lib) p.set("library", state.lib);
+    fetch("/api/collections?" + p.toString(), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ collections: collections })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("保存に失敗しました(" + r.status + ")");
+      location.reload();
+    }).catch(function (e) { warn(String(e.message || e)); });
+  }
+
+  function showError(e) {
+    content.textContent = "";
+    content.appendChild(el("div", "empty", "読み込みエラー: " + (e.message || e)));
   }
 
   // ================= プレイヤー画面 =================
-  var base = "/books/" + encodeURIComponent(book) + "/";
-  Promise.all([
-    fetch(base + "deck.json").then(function (r) { if (!r.ok) throw new Error("deck.json " + r.status); return r.json(); }),
-    // content.json は無くても動く(構造/本文分離): その場合はスライドID・種別のみ表示
-    fetch(base + "content.json").then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-  ]).then(function (res) {
-    var deck = res[0];
-    // プロトタイプ汚染耐性: 外部データ(スライドid)をキーにするためObject.create(null)にする
-    var content = Object.create(null);
-    if (res[1] && res[1].slides) {
-      Object.keys(res[1].slides).forEach(function (k) { content[k] = res[1].slides[k]; });
-    }
+  function viewPlayer(bookId) {
+    var lib = state.lib;
+    var base = bookBase(lib, bookId);
+    content.textContent = "";
 
-    document.getElementById("crumb").textContent = deck.title || book;
-    if (!res[1]) {
-      warn("content.json が無いため、スライドは構成情報のみ表示しています。");
-    }
-    if ("mediaSession" in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: deck.title || book, artist: "kikimiru" });
-    }
+    var wrap = el("div");
+    wrap.id = "player";
+    // 静的な骨組みのみをinnerHTMLで作る(外部データは後から必ずtextContentで入れる)
+    wrap.innerHTML =
+      '<div id="paneMain">' +
+      '<div class="crumbs"><a id="crumbBack"></a><span>›</span><span id="crumbTitle"></span></div>' +
+      '<section id="slide" aria-live="polite"></section>' +
+      '<div class="meter"><span id="mSlide"></span><span id="mTime"></span></div>' +
+      '<div id="resume"><span>前回の続き <b id="resumeAt"></b> から再開します</span><button id="resumeOff" type="button" aria-label="最初から再生">×</button></div>' +
+      '<div id="controls"><audio id="audio" controls preload="metadata"></audio>' +
+      '<div class="row" id="speeds"></div>' +
+      '<div class="row"><button id="prev" type="button">◀ 前のスライド</button><button id="next" type="button">次のスライド ▶</button></div></div>' +
+      '</div>' +
+      '<nav id="paneList"><div class="head">スライド一覧(タップで移動)</div><div id="list"></div></nav>';
+    content.appendChild(wrap);
 
-    document.getElementById("main").classList.add("show");
-    var audio = document.getElementById("audio");
+    var back = document.getElementById("crumbBack");
+    back.href = qs({ view: "library" });
+    back.textContent = "本棚";
 
-    // audio.src の組み立て前にファイル名を検証する(パス区切り・親ディレクトリ参照・
-    // クエリ/フラグメントの混入を拒否し、意図しないリクエストになるのを防ぐ)
-    var audioName = (deck.audio && typeof deck.audio.src === "string" && deck.audio.src) || "audio.mp3";
-    if (/[\/\\]|\.\.|[?#]/.test(audioName)) {
-      warn("音声ファイル名が不正なため読み込みを中止しました: " + audioName);
-    } else {
-      // 音声のロード失敗(ファイル未検出・コーデック非対応等)を通知する
-      audio.addEventListener("error", function () {
-        warn("音声を読み込めませんでした: " + audioName);
+    Promise.all([
+      fetch(base + "deck.json").then(function (r) { if (!r.ok) throw new Error("deck.json " + r.status); return r.json(); }),
+      // content.json は無くても動く(構造/本文分離): その場合はスライドID・種別のみ表示
+      fetch(base + "content.json").then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+    ]).then(function (res) {
+      var deck = res[0];
+      // プロトタイプ汚染耐性: 外部データ(スライドid)をキーにするためObject.create(null)にする
+      var bodyMap = Object.create(null);
+      if (res[1] && res[1].slides) {
+        Object.keys(res[1].slides).forEach(function (k) { bodyMap[k] = res[1].slides[k]; });
+      }
+
+      var title = (typeof deck.title === "string" && deck.title) || bookId;
+      document.getElementById("crumbTitle").textContent = title;
+      document.title = title + " — kikimiru";
+      if (!res[1]) warn("content.json が無いため、スライドは構成情報のみ表示しています。");
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({ title: title, artist: "kikimiru" });
+      }
+
+      var audio = document.getElementById("audio");
+
+      // audio.src の組み立て前にファイル名を検証する(パス区切り・親ディレクトリ参照・
+      // クエリ/フラグメントの混入を拒否し、意図しないリクエストになるのを防ぐ)
+      var audioName = (deck.audio && typeof deck.audio.src === "string" && deck.audio.src) || "audio.mp3";
+      if (/[\/\\]|\.\.|[?#]/.test(audioName)) {
+        warn("音声ファイル名が不正なため読み込みを中止しました: " + audioName);
+      } else {
+        // 音声のロード失敗(ファイル未検出・コーデック非対応等)を通知する
+        audio.addEventListener("error", function () {
+          warn("音声を読み込めませんでした: " + audioName);
+        });
+        audio.src = base + encodeURIComponent(audioName);
+      }
+
+      var cues = (deck.cues || []).slice().sort(function (a, b) { return a.t - b.t; });
+      if (!cues.length) {
+        // cuesが空のdeckはcues[0]参照で例外になりUIが半壊するため、ここで止める
+        warn("この本には再生可能なスライドがありません(deck.jsonのcuesが空です)");
+        return;
+      }
+
+      var slideMeta = Object.create(null);
+      (deck.slides || []).forEach(function (s) { if (s && s.id) slideMeta[s.id] = s; });
+      var cur = -1;
+
+      var slideEl = document.getElementById("slide");
+      function render(i) {
+        var cue = cues[i];
+        var meta = slideMeta[cue.slide] || {};
+        var body = bodyMap[cue.slide] || {};
+        var kind = safeKind(meta.kind);
+        slideEl.className = "kind-" + kind;
+        // 切替アニメーション(クラスを外して再付与し、リフローでアニメーションを再始動)
+        void slideEl.offsetWidth;
+        slideEl.classList.add("flip");
+        slideEl.innerHTML = '<div class="kind"></div><h2></h2>';
+        var kindLabel = { title: "タイトル", section: "セクション", question: "考えてみる" }[kind] || ("スライド " + (i + 1));
+        slideEl.querySelector(".kind").textContent = kindLabel;
+        slideEl.querySelector("h2").textContent = body.title || cue.slide;
+        if (body.bullets && body.bullets.length) {
+          var ul = document.createElement("ul");
+          body.bullets.forEach(function (b) {
+            var li = document.createElement("li");
+            li.textContent = b;
+            ul.appendChild(li);
+          });
+          slideEl.appendChild(ul);
+        }
+        if (body.note) {
+          var note = el("div", "note", body.note);
+          slideEl.appendChild(note);
+        }
+        document.getElementById("mSlide").textContent = "スライド " + (i + 1) + " / " + cues.length;
+        var items = document.querySelectorAll("#list .item");
+        items.forEach(function (elm, j) { elm.classList.toggle("cur", j === i); });
+        // #listは独立したスクロールコンテナのため、block:"nearest"は#list内で完結する
+        if (items[i]) items[i].scrollIntoView({ block: "nearest" });
+      }
+
+      function cueAt(t) {
+        var i = 0;
+        while (i + 1 < cues.length && cues[i + 1].t <= t) i++;
+        return i;
+      }
+
+      var lastSaved = 0;
+      audio.addEventListener("timeupdate", function () {
+        var i = cueAt(audio.currentTime);
+        if (i !== cur) { cur = i; render(i); }
+        document.getElementById("mTime").textContent =
+          fmt(audio.currentTime) + " / " + fmt(audio.duration || (deck.audio && deck.audio.duration) || 0);
+        // 再生位置の保存は5秒ごとに間引く(毎timeupdateで書くとストレージ書き込みが過剰)
+        var now = Date.now();
+        if (now - lastSaved > 5000 && !audio.paused) {
+          lastSaved = now;
+          savePos(lib, bookId, audio.currentTime, audio.duration || (deck.audio && deck.audio.duration) || 0);
+        }
       });
-      audio.src = base + encodeURIComponent(audioName);
-    }
+      // 離脱時にも保存する(モバイルSafariはunloadが来ないためpagehide/visibilitychangeで)
+      function saveNow() {
+        if (audio.currentTime > 0) {
+          savePos(lib, bookId, audio.currentTime, audio.duration || (deck.audio && deck.audio.duration) || 0);
+        }
+      }
+      window.addEventListener("pagehide", saveNow);
+      document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") saveNow();
+      });
+      audio.addEventListener("pause", saveNow);
 
-    var cues = (deck.cues || []).slice().sort(function (a, b) { return a.t - b.t; });
-    if (!cues.length) {
-      // cuesが空のdeckはcues[0]参照で例外になりUIが半壊するため、ここで止める
-      warn("この本には再生可能なスライドがありません(deck.jsonのcuesが空です)");
+      // 前回の続きから再開(先頭・末尾付近の保存値は無視する)
+      var saved = loadPos(lib, bookId);
+      if (saved && saved.t > 10 && (!saved.d || saved.t < saved.d - 5)) {
+        var bar = document.getElementById("resume");
+        bar.style.display = "flex";
+        document.getElementById("resumeAt").textContent = fmt(saved.t);
+        audio.addEventListener("loadedmetadata", function () {
+          if (bar.style.display !== "none") audio.currentTime = saved.t;
+        }, { once: true });
+        document.getElementById("resumeOff").addEventListener("click", function () {
+          bar.style.display = "none";
+          audio.currentTime = 0;
+          cur = -1;
+          render(cueAt(0));
+        });
+      }
+
+      function seekTo(i) {
+        audio.currentTime = cues[i].t + 0.01;
+        if (audio.paused) {
+          // 自動再生ブロック時のunhandled promise rejectionを防ぐ
+          audio.play().catch(function () {});
+        }
+      }
+      document.getElementById("prev").addEventListener("click", function () { seekTo(Math.max(0, cur - 1)); });
+      document.getElementById("next").addEventListener("click", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
+
+      if ("mediaSession" in navigator) {
+        // ロック画面/通知からの前後スライド送り(既存のprev/nextロジックを流用)
+        navigator.mediaSession.setActionHandler("previoustrack", function () { seekTo(Math.max(0, cur - 1)); });
+        navigator.mediaSession.setActionHandler("nexttrack", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
+      }
+
+      [0.75, 1.0, 1.25, 1.5, 2.0].forEach(function (v) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = "×" + v;
+        if (v === 1.0) b.classList.add("on");
+        b.addEventListener("click", function () {
+          audio.playbackRate = v;
+          document.querySelectorAll("#speeds button").forEach(function (x) { x.classList.remove("on"); });
+          b.classList.add("on");
+        });
+        document.getElementById("speeds").appendChild(b);
+      });
+
+      var list = document.getElementById("list");
+      cues.forEach(function (cue, i) {
+        var body = bodyMap[cue.slide] || {};
+        var b = document.createElement("button");
+        b.type = "button";
+        b.className = "item";
+        b.appendChild(el("span", "n", String(i + 1)));
+        b.appendChild(el("span", "t", fmt(cue.t)));
+        b.appendChild(el("span", "ttl", body.title || cue.slide));
+        b.addEventListener("click", function () { seekTo(i); });
+        list.appendChild(b);
+      });
+
+      cur = 0;
+      render(0);
+    }).catch(function (e) {
+      document.getElementById("crumbTitle").textContent = "読み込みエラー";
+      warn("ブックを読み込めませんでした: " + (e.message || e));
+    });
+  }
+
+  // ================= 起動 =================
+  fetch("/api/libraries").then(function (r) { return r.json(); }).then(function (d) {
+    var libs = d.libraries || [];
+    if (!libs.length) {
+      warn("ライブラリがありません。--library でブックフォルダのディレクトリを指定してください。");
       return;
     }
+    // 選択中ライブラリの解決(URL > localStorage > 先頭)
+    var known = libs.map(function (l) { return l.id; });
+    if (known.indexOf(state.lib) === -1) state.lib = known[0];
+    lsSet("kikimiru.lib", state.lib);
 
-    // プロトタイプ汚染耐性: 外部データ(スライドid)をキーにするためObject.create(null)にする
-    var slideMeta = Object.create(null);
-    (deck.slides || []).forEach(function (s) { if (s && s.id) slideMeta[s.id] = s; });
-    var cur = -1;
+    initHeader(libs);
+    renderNav();
 
-    var slideEl = document.getElementById("slide");
-    function render(i) {
-      var cue = cues[i];
-      var meta = slideMeta[cue.slide] || {};
-      var body = content[cue.slide] || {};
-      var kind = safeKind(meta.kind);
-      slideEl.className = "kind-" + kind;
-      // 切替アニメーション(クラスを外して再付与し、リフローでアニメーションを再始動)
-      void slideEl.offsetWidth;
-      slideEl.classList.add("flip");
-      slideEl.innerHTML = '<div class="kind"></div><h2></h2>';
-      var kindLabel = { title: "タイトル", section: "セクション", question: "考えてみる" }[kind] || ("スライド " + (i + 1));
-      slideEl.querySelector(".kind").textContent = kindLabel;
-      slideEl.querySelector("h2").textContent = body.title || cue.slide;
-      if (body.bullets && body.bullets.length) {
-        var ul = document.createElement("ul");
-        body.bullets.forEach(function (b) {
-          var li = document.createElement("li");
-          li.textContent = b;
-          ul.appendChild(li);
-        });
-        slideEl.appendChild(ul);
-      }
-      if (body.note) {
-        var note = document.createElement("div");
-        note.className = "note";
-        note.textContent = body.note;
-        slideEl.appendChild(note);
-      }
-      document.getElementById("mSlide").textContent = "スライド " + (i + 1) + " / " + cues.length;
-      var items = document.querySelectorAll("#list .item");
-      items.forEach(function (el, j) { el.classList.toggle("cur", j === i); });
-      // #listは独立したスクロールコンテナ(CSSでmax-height+overflow-y:auto)のため、
-      // block:"nearest"はページ全体ではなく#list内のスクロールだけで完結する
-      if (items[i]) items[i].scrollIntoView({ block: "nearest" });
+    var book = params.get("book");
+    if (book) {
+      state.view = "player";
+      renderNav();
+      viewPlayer(book);
+      return;
     }
-
-    function cueAt(t) {
-      var i = 0;
-      while (i + 1 < cues.length && cues[i + 1].t <= t) i++;
-      return i;
+    switch (state.view) {
+      case "library": viewLibrary(); break;
+      case "series": viewSeries(); break;
+      case "collections": viewCollections(); break;
+      case "authors": viewPeople("authors"); break;
+      case "narrators": viewPeople("narrators"); break;
+      case "stats": viewStats(); break;
+      default: state.view = "home"; renderNav(); viewHome();
     }
-
-    var lastSaved = 0;
-    audio.addEventListener("timeupdate", function () {
-      var i = cueAt(audio.currentTime);
-      if (i !== cur) { cur = i; render(i); }
-      document.getElementById("mTime").textContent =
-        fmt(audio.currentTime) + " / " + fmt(audio.duration || (deck.audio && deck.audio.duration) || 0);
-      // 再生位置の保存は5秒ごとに間引く(毎timeupdateで書くとストレージ書き込みが過剰)
-      var now = Date.now();
-      if (now - lastSaved > 5000 && !audio.paused) {
-        lastSaved = now;
-        savePos(book, audio.currentTime, audio.duration || (deck.audio && deck.audio.duration) || 0);
-      }
-    });
-    // 離脱時にも保存する(モバイルSafariはunloadが来ないためpagehide/visibilitychangeで)
-    function saveNow() {
-      if (audio.currentTime > 0) {
-        savePos(book, audio.currentTime, audio.duration || (deck.audio && deck.audio.duration) || 0);
-      }
-    }
-    window.addEventListener("pagehide", saveNow);
-    document.addEventListener("visibilitychange", function () {
-      if (document.visibilityState === "hidden") saveNow();
-    });
-    audio.addEventListener("pause", saveNow);
-
-    // 前回の続きから再開(先頭・末尾付近の保存値は無視する)
-    var saved = loadPos(book);
-    if (saved && saved.t > 10 && (!saved.d || saved.t < saved.d - 5)) {
-      var bar = document.getElementById("resume");
-      bar.style.display = "flex";
-      document.getElementById("resumeAt").textContent = fmt(saved.t);
-      audio.addEventListener("loadedmetadata", function () {
-        if (bar.style.display !== "none") audio.currentTime = saved.t;
-      }, { once: true });
-      document.getElementById("resumeOff").addEventListener("click", function () {
-        bar.style.display = "none";
-        audio.currentTime = 0;
-        cur = -1;
-        render(cueAt(0));
-      });
-    }
-
-    function seekTo(i) {
-      audio.currentTime = cues[i].t + 0.01;
-      if (audio.paused) {
-        // 自動再生ブロック時のunhandled promise rejectionを防ぐ
-        audio.play().catch(function () {});
-      }
-    }
-    document.getElementById("prev").addEventListener("click", function () { seekTo(Math.max(0, cur - 1)); });
-    document.getElementById("next").addEventListener("click", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
-
-    if ("mediaSession" in navigator) {
-      // ロック画面/通知からの前後スライド送り(既存のprev/nextロジックを流用)
-      navigator.mediaSession.setActionHandler("previoustrack", function () { seekTo(Math.max(0, cur - 1)); });
-      navigator.mediaSession.setActionHandler("nexttrack", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
-    }
-
-    [0.75, 1.0, 1.25, 1.5, 2.0].forEach(function (v) {
-      var b = document.createElement("button");
-      b.type = "button";
-      b.textContent = "×" + v;
-      if (v === 1.0) b.classList.add("on");
-      b.addEventListener("click", function () {
-        audio.playbackRate = v;
-        document.querySelectorAll("#speeds button").forEach(function (x) { x.classList.remove("on"); });
-        b.classList.add("on");
-      });
-      document.getElementById("speeds").appendChild(b);
-    });
-
-    var list = document.getElementById("list");
-    cues.forEach(function (cue, i) {
-      var body = content[cue.slide] || {};
-      var b = document.createElement("button");
-      b.type = "button";
-      b.className = "item";
-      b.innerHTML = '<span class="n"></span><span class="t"></span><span class="ttl"></span>';
-      b.querySelector(".n").textContent = String(i + 1);
-      b.querySelector(".t").textContent = fmt(cue.t);
-      b.querySelector(".ttl").textContent = body.title || cue.slide;
-      b.addEventListener("click", function () { seekTo(i); });
-      list.appendChild(b);
-    });
-
-    cur = 0;
-    render(0);
-  }).catch(function (e) {
-    document.getElementById("crumb").textContent = "読み込みエラー: " + e.message;
-    warn("ブックを読み込めませんでした: " + e.message);
+  }).catch(function () {
+    warn("サーバに接続できません。");
   });
 })();
 </script>

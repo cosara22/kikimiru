@@ -1,0 +1,48 @@
+{
+  "kikimiru": 1,
+  "slides": {
+    "s1": {
+      "title": "デモ素材のつくりかた",
+      "bullets": [
+        "正弦波と図形だけで同期教材を組む",
+        "全5枚・約35秒のデモ音声"
+      ],
+      "note": "生成スクリプト: demo/make_demo.py"
+    },
+    "s2": {
+      "title": "音をつくる",
+      "bullets": [
+        "ffmpeg の sine で1区間ずつ作る",
+        "区間ごとに周波数を変える",
+        "concat で1本の mp3 にまとめる"
+      ],
+      "note": null
+    },
+    "s3": {
+      "title": "cue を書き出す",
+      "bullets": [
+        "区間の開始秒がそのまま cue になる",
+        "先頭の cue は必ず t = 0.0",
+        "秒とスライドIDの対応表ができる"
+      ],
+      "note": null
+    },
+    "s4": {
+      "title": "表紙をつくる",
+      "bullets": [
+        "lavfi の gradients で下地を描く",
+        "drawbox と drawgrid で図形を重ねる",
+        "512x512 の PNG で書き出す"
+      ],
+      "note": null
+    },
+    "s5": {
+      "title": "作り替える",
+      "bullets": [
+        "周波数と区間の長さを変えて試す",
+        "第三者の素材は使わない"
+      ],
+      "note": "出所は demo/SOURCES.md に記録する"
+    }
+  }
+}

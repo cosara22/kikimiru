@@ -5,6 +5,10 @@ kikimiru は「構造(deck.json)」と「本文(content.json)」を分離する�
 本ツールはその定義に沿ってブックフォルダを検証する。問題は1件見つけて止めず、
 まとめて報告する。
 
+スキーマ v2 では deck.json に書誌メタデータ(著者・話者・シリーズ・タグ・説明・
+表紙・追加日時)を追加した。v2フィールドは**すべて任意**であり、v1のdeckも
+引き続き VALID と判定する(後方互換)。
+
 使い方:
     python tools/validate_deck.py <ブックフォルダ>
     例: python tools/validate_deck.py demo/library/demo-book
@@ -14,12 +18,26 @@ kikimiru は「構造(deck.json)」と「本文(content.json)」を分離する�
     1 — 検証NG(標準出力に ERROR の一覧)
 """
 import json
+import re
 import sys
+from datetime import date, datetime
 from pathlib import Path
 
 VALID_KINDS = {"title", "section", "content", "question"}
 MAX_BULLETS = 5
 MAX_BULLET_CHARS = 40
+
+# 許容するスキーマ版。v1のdeckも読めるよう両方を受け入れる。
+VALID_SCHEMA_VERSIONS = (1, 2)
+
+# v2で追加された deck.json の任意フィールド。
+# kikimiru: 1 のdeckにこれらが入っていた場合は WARN で版の更新を促す。
+V2_DECK_FIELDS = (
+    "authors", "narrators", "series", "tags", "description", "cover", "addedAt",
+)
+
+# addedAt の日付のみ形式(YYYY-MM-DD)。
+DATE_ONLY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def is_num(v) -> bool:
@@ -33,6 +51,91 @@ def is_int(v) -> bool:
 
 def is_str(v) -> bool:
     return isinstance(v, str)
+
+
+def is_str_list(v) -> bool:
+    """文字列のみからなる配列か(空配列は許容)。"""
+    return isinstance(v, list) and all(is_str(x) for x in v)
+
+
+def looks_like_iso_date(s: str) -> bool:
+    """`YYYY-MM-DD` もしくは ISO8601 日時として解釈できるか。
+
+    形式違反はWARN止まりなので、ここでは「妥当そうか」だけを判定する。
+    末尾 `Z` は Python 3.10 以前の fromisoformat が解釈できないため補正する。
+    """
+    if DATE_ONLY_RE.match(s):
+        try:
+            date.fromisoformat(s)
+            return True
+        except ValueError:
+            return False
+    t = s[:-1] + "+00:00" if s.endswith(("Z", "z")) else s
+    try:
+        datetime.fromisoformat(t)
+        return True
+    except ValueError:
+        return False
+
+
+def validate_v2_meta(deck: dict, errors: list, warnings: list) -> None:
+    """deck.json のv2書誌メタデータを検証する。
+
+    すべて任意フィールドのため、**存在する場合のみ**型を検査する(欠損はエラーにしない)。
+    """
+    # --- 文字列配列 3種(authors / narrators / tags) ---
+    for key in ("authors", "narrators", "tags"):
+        if key not in deck:
+            continue
+        if not is_str_list(deck[key]):
+            errors.append(
+                f"deck.json: {key} は文字列の配列である必要があります(実際: {deck[key]!r})")
+
+    # --- series ---
+    if "series" in deck:
+        series = deck["series"]
+        if not isinstance(series, dict):
+            errors.append(
+                f"deck.json: series はオブジェクトである必要があります(実際: {series!r})")
+        else:
+            name = series.get("name")
+            if not is_str(name) or not name:
+                errors.append(
+                    f"deck.json: series.name は空でない文字列である必要があります(実際: {name!r})")
+            # sequence は任意。"1" や "2.5" のような文字列で表す(数値ではない)。
+            if "sequence" in series and not is_str(series["sequence"]):
+                errors.append(
+                    f"deck.json: series.sequence は文字列である必要があります"
+                    f"(実際: {series['sequence']!r})")
+
+    # --- description ---
+    if "description" in deck and not is_str(deck["description"]):
+        errors.append(
+            f"deck.json: description は文字列である必要があります(実際: {deck['description']!r})")
+
+    # --- cover ---
+    if "cover" in deck:
+        cover = deck["cover"]
+        if not is_str(cover) or not cover:
+            errors.append(
+                f"deck.json: cover は空でない文字列である必要があります(実際: {cover!r})")
+        elif "/" in cover or "\\" in cover:
+            errors.append(
+                f"deck.json: cover は単一セグメントのファイル名である必要があります"
+                f"('/' '\\' を含めない): {cover!r}")
+        elif ".." in cover:
+            errors.append(f"deck.json: cover に '..' を含めることはできません: {cover!r}")
+
+    # --- addedAt ---
+    if "addedAt" in deck:
+        added_at = deck["addedAt"]
+        if not is_str(added_at):
+            errors.append(
+                f"deck.json: addedAt は文字列である必要があります(実際: {added_at!r})")
+        elif not looks_like_iso_date(added_at):
+            warnings.append(
+                f"deck.json: addedAt が YYYY-MM-DD でも ISO8601 日時でもありません"
+                f"(実際: {added_at!r})")
 
 
 def load_json(path: Path, errors: list):
@@ -52,15 +155,29 @@ def load_json(path: Path, errors: list):
         return None
 
 
-def validate_deck(deck, errors: list) -> set:
+def validate_deck(deck, errors: list, warnings: list) -> set:
     """deck.json(構造データ)を検証する。戻り値はslide idの集合(cross-check用)。"""
     if not isinstance(deck, dict):
         errors.append("deck.json: トップレベルはオブジェクトである必要があります")
         return set()
 
     kikimiru = deck.get("kikimiru")
-    if not is_int(kikimiru) or kikimiru != 1:
-        errors.append(f"deck.json: kikimiru は整数の1である必要があります(実際: {kikimiru!r})")
+    if not is_int(kikimiru) or kikimiru not in VALID_SCHEMA_VERSIONS:
+        errors.append(
+            f"deck.json: kikimiru は整数の "
+            f"{' または '.join(str(v) for v in VALID_SCHEMA_VERSIONS)} "
+            f"である必要があります(実際: {kikimiru!r})")
+
+    # v2の書誌メタデータは版に関係なく型を検査する(混入していても型は正しく保つ)。
+    validate_v2_meta(deck, errors, warnings)
+
+    # v1宣言のdeckにv2フィールドが入っている場合は版の更新を促す(エラーにはしない)。
+    if kikimiru == 1:
+        used = [k for k in V2_DECK_FIELDS if k in deck]
+        if used:
+            warnings.append(
+                f"deck.json: v2フィールド({', '.join(used)})が使われていますが "
+                f"kikimiru: 1 です。2 への更新を検討してください")
 
     title = deck.get("title")
     if not is_str(title):
@@ -146,8 +263,11 @@ def validate_content(content, errors: list, warnings: list) -> None:
         return
 
     kikimiru = content.get("kikimiru")
-    if not is_int(kikimiru) or kikimiru != 1:
-        errors.append(f"content.json: kikimiru は整数の1である必要があります(実際: {kikimiru!r})")
+    if not is_int(kikimiru) or kikimiru not in VALID_SCHEMA_VERSIONS:
+        errors.append(
+            f"content.json: kikimiru は整数の "
+            f"{' または '.join(str(v) for v in VALID_SCHEMA_VERSIONS)} "
+            f"である必要があります(実際: {kikimiru!r})")
 
     slides = content.get("slides")
     if not isinstance(slides, dict):
@@ -196,7 +316,7 @@ def main() -> int:
     deck = load_json(book / "deck.json", errors)
     slide_ids = set()
     if deck is not None:
-        slide_ids = validate_deck(deck, errors)
+        slide_ids = validate_deck(deck, errors, warnings)
 
     content_path = book / "content.json"
     if content_path.is_file():

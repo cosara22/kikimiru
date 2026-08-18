@@ -1,0 +1,62 @@
+{
+  "kikimiru": 1,
+  "slides": {
+    "s1": {
+      "title": "kikimiru の手引き 1",
+      "bullets": [
+        "スキーマ v2 の読み方",
+        "全7枚・約42秒のデモ音声"
+      ],
+      "note": "音声・表紙とも ffmpeg で合成(自作素材)"
+    },
+    "s2": {
+      "title": "2つのファイル",
+      "bullets": [],
+      "note": null
+    },
+    "s3": {
+      "title": "deck.json — 構造",
+      "bullets": [
+        "再生位置とスライドの対応だけを持つ",
+        "本文テキストは入らない",
+        "共有・書き出しの対象はこちら側"
+      ],
+      "note": null
+    },
+    "s4": {
+      "title": "content.json — 本文",
+      "bullets": [
+        "title / bullets / note を持つ",
+        "既定でローカル専用",
+        "無くても構成だけで再生できる"
+      ],
+      "note": null
+    },
+    "s5": {
+      "title": "書誌メタデータ(v2)",
+      "bullets": [
+        "authors / narrators で人を示す",
+        "series で巻をまとめる",
+        "tags と description は一覧の手がかり"
+      ],
+      "note": "v2のフィールドはすべて任意"
+    },
+    "s6": {
+      "title": "cover と addedAt",
+      "bullets": [
+        "cover はフォルダ内の画像ファイル名",
+        "addedAt は YYYY-MM-DD の追加日",
+        "どちらも無ければ既定の表示になる"
+      ],
+      "note": null
+    },
+    "s7": {
+      "title": "書いてみる",
+      "bullets": [
+        "自分の録音で deck.json を書く",
+        "tools/validate_deck.py で検証する"
+      ],
+      "note": null
+    }
+  }
+}
