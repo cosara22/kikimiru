@@ -8,7 +8,6 @@ For your own lectures, recordings, narrated tutorials, language practice, and pu
 - **No content included.** Bring your own audio and slide definitions (see [docs/SCHEMA.md](docs/SCHEMA.md)).
 - **Self-host only.** A small Python server (stdlib only, HTTP Range support for mobile Safari) serves your local library. Nothing leaves your machine.
 - **Structure/content separation by design.** Timing data (`deck.json`) and slide text (`content.json`) are separate files; sharing and export features only ever operate on the structure side.
-- Independent implementation — contains no [Audiobookshelf](https://www.audiobookshelf.org/) code and is not affiliated with the Audiobookshelf project.
 
 ## Screenshots
 
@@ -72,7 +71,6 @@ Phase 1 — library experience (multi-library, search, series/authors/tags, book
 - **コンテンツは同梱しません。** 音声とスライド定義はご自身で用意します([docs/SCHEMA.md](docs/SCHEMA.md))
 - **self-host 専用。** Python 標準ライブラリのみの小さなサーバがローカルのライブラリを配信します(モバイル Safari のシークに必要な HTTP Range 対応)。データは手元から出ません
 - **構造と本文の分離。** タイミング(`deck.json`)と本文(`content.json`)は別ファイルで、共有・書き出し機能が扱うのは常に構造側だけです
-- 独立実装です — [Audiobookshelf](https://www.audiobookshelf.org/) のコードは含まず、同プロジェクトとは無関係です
 
 ## スクリーンショット
 
