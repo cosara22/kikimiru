@@ -1,0 +1,7 @@
+# ユーザーライブラリ(手元のコンテンツ)はコミットしない
+/library/
+
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

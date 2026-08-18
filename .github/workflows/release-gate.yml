@@ -1,0 +1,24 @@
+name: release-gate
+
+# ローカルの pre-push フックは `git push --no-verify` で無効化できるため、
+# 同じ検査を CI 側でも独立して実行する(tools/release_gate.py のdocstring参照)。
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: release_gate
+        run: python tools/release_gate.py
+      - name: validate demo deck
+        run: python tools/validate_deck.py demo/library/demo-book

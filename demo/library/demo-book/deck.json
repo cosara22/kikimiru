@@ -1,0 +1,61 @@
+{
+  "kikimiru": 1,
+  "title": "kikimiru デモ — 同期の仕組み",
+  "audio": {
+    "src": "audio.mp3",
+    "duration": 48.0,
+    "sha256": "29589166ee380586b1fac51e2901457901779509972ce497a478db87edd2454d"
+  },
+  "slides": [
+    {
+      "id": "s1",
+      "kind": "title"
+    },
+    {
+      "id": "s2",
+      "kind": "section"
+    },
+    {
+      "id": "s3",
+      "kind": "content"
+    },
+    {
+      "id": "s4",
+      "kind": "content"
+    },
+    {
+      "id": "s5",
+      "kind": "content"
+    },
+    {
+      "id": "s6",
+      "kind": "question"
+    }
+  ],
+  "cues": [
+    {
+      "t": 0.0,
+      "slide": "s1"
+    },
+    {
+      "t": 8.0,
+      "slide": "s2"
+    },
+    {
+      "t": 16.0,
+      "slide": "s3"
+    },
+    {
+      "t": 24.0,
+      "slide": "s4"
+    },
+    {
+      "t": 32.0,
+      "slide": "s5"
+    },
+    {
+      "t": 40.0,
+      "slide": "s6"
+    }
+  ]
+}

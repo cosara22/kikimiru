@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>kikimiru</title>
+<style>
+  /* kikimiru player — 単一ファイル・外部CDNなし・ダークテーマ・スマホ縦最適化 */
+  :root {
+    --bg: #101418; --bg2: #171d23; --card: #1c242c;
+    --ink: #e8edf2; --ink2: #9fb0bd; --line: #2a343e;
+    --brand: #b39ddb; --brand-dim: #2a2140; --accent-q: #d9a86a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--bg); color: var(--ink); font-family: "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; }
+  header {
+    position: sticky; top: 0; z-index: 5; background: var(--bg2);
+    border-bottom: 1px solid var(--line);
+    padding: calc(env(safe-area-inset-top) + 10px) 14px 8px;
+  }
+  header .app { font-size: 12px; color: var(--ink2); }
+  header .book { font-size: 15px; font-weight: 600; }
+  #warn { display: none; background: #3a2b12; color: #f0c987; font-size: 12px; padding: 6px 14px; border-bottom: 1px solid #57431f; }
+  main { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; max-width: 720px; width: 100%; margin: 0 auto; }
+  #slide {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 18px 16px; min-height: 38dvh;
+    display: flex; flex-direction: column; justify-content: center; gap: 12px;
+  }
+  #slide .kind { font-size: 11px; letter-spacing: .08em; color: var(--brand); }
+  #slide h2 { font-size: 20px; line-height: 1.4; }
+  #slide ul { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+  #slide ul li { padding-left: 1em; text-indent: -1em; font-size: 15px; line-height: 1.55; }
+  #slide ul li::before { content: "— "; color: var(--brand); }
+  #slide .note { font-size: 12px; color: var(--ink2); border-top: 1px dashed var(--line); padding-top: 8px; }
+  #slide.kind-title, #slide.kind-section { text-align: center; }
+  #slide.kind-title h2 { font-size: 23px; }
+  #slide.kind-section h2 { color: var(--brand); }
+  #slide.kind-title ul li, #slide.kind-section ul li { text-indent: 0; padding-left: 0; }
+  #slide.kind-title ul li::before, #slide.kind-section ul li::before { content: ""; }
+  #slide.kind-question .kind { color: var(--accent-q); }
+  #slide.kind-question ul li::before { content: "? "; color: var(--accent-q); }
+  .meter { display: flex; justify-content: space-between; font-size: 12px; color: var(--ink2); padding: 0 2px; }
+  #controls { display: flex; flex-direction: column; gap: 8px; }
+  audio { width: 100%; height: 40px; }
+  .row { display: flex; gap: 8px; }
+  .row button {
+    flex: 1; background: var(--bg2); color: var(--ink); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 0; font-size: 13px;
+  }
+  .row button.on { background: var(--brand-dim); border-color: var(--brand); color: var(--brand); }
+  .row button:active { transform: translateY(1px); }
+  /* #listを独立したスクロールコンテナにする(現在スライドの切替時、
+     ページ全体ではなくこの中だけがスクロールするようにする) */
+  #list { display: flex; flex-direction: column; gap: 4px; padding-bottom: calc(env(safe-area-inset-bottom) + 16px); max-height: 40vh; overflow-y: auto; }
+  #list .head { font-size: 12px; color: var(--ink2); margin: 8px 2px 2px; }
+  #list .item {
+    display: flex; gap: 10px; align-items: baseline; background: none;
+    border: 1px solid transparent; border-radius: 8px; padding: 8px 10px;
+    color: var(--ink2); font-size: 13px; text-align: left; width: 100%;
+  }
+  #list .item .t { font-variant-numeric: tabular-nums; font-size: 12px; min-width: 3.4em; }
+  #list .item.cur { background: var(--card); border-color: var(--brand); color: var(--ink); }
+  #list .item.cur .t { color: var(--brand); }
+  #picker { padding: 20px 14px; display: none; flex-direction: column; gap: 10px; max-width: 720px; margin: 0 auto; width: 100%; }
+  #picker a {
+    display: block; background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 14px; color: var(--ink); text-decoration: none; font-size: 15px;
+  }
+  #picker a span { display: block; font-size: 12px; color: var(--ink2); margin-top: 3px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="app">kikimiru</div>
+  <div class="book" id="hBook">読み込み中…</div>
+</header>
+<div id="warn" role="status"></div>
+<div id="picker"></div>
+
+<main id="main" hidden>
+  <section id="slide" aria-live="polite"></section>
+  <div class="meter"><span id="mSlide"></span><span id="mTime"></span></div>
+  <div id="controls">
+    <audio id="audio" controls preload="metadata"></audio>
+    <div class="row" id="speeds"></div>
+    <div class="row">
+      <button id="prev">◀ 前のスライド</button>
+      <button id="next">次のスライド ▶</button>
+    </div>
+  </div>
+  <nav id="list"><div class="head">スライド一覧(タップで移動)</div></nav>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var book = new URLSearchParams(location.search).get("book");
+
+  function fmt(sec) {
+    sec = Math.max(0, Math.floor(sec));
+    return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  }
+
+  // #warn へ警告文を積み上げて表示する(複数件出ても既存メッセージを消さない)
+  function warn(msg) {
+    var w = document.getElementById("warn");
+    w.style.display = "block";
+    if (w.textContent) {
+      var line = document.createElement("div");
+      line.textContent = msg;
+      w.appendChild(line);
+    } else {
+      w.textContent = msg;
+    }
+  }
+
+  // スライド種別のallowlist(deck.json由来の値をCSSクラス名へ直接注入しない)
+  var ALLOWED_KINDS = ["title", "section", "content", "question"];
+  function safeKind(k) {
+    return ALLOWED_KINDS.indexOf(k) !== -1 ? k : "content";
+  }
+
+  // ブック未指定: /api/books から一覧
+  if (!book) {
+    var picker = document.getElementById("picker");
+    picker.style.display = "flex";
+    document.getElementById("hBook").textContent = "ブックを選択";
+    fetch("/api/books").then(function (r) { return r.json(); }).then(function (d) {
+      if (!d.books.length) { picker.textContent = "ライブラリにブックがありません。"; return; }
+      d.books.forEach(function (b) {
+        var a = document.createElement("a");
+        a.href = "?book=" + encodeURIComponent(b.id);
+        a.textContent = b.title;
+        var s = document.createElement("span");
+        s.textContent = b.id + (b.duration ? " / " + fmt(b.duration) : "") + " / " + b.slides + "枚";
+        a.appendChild(s);
+        picker.appendChild(a);
+      });
+    }).catch(function () {
+      picker.textContent = "サーバに接続できません。";
+    });
+    return;
+  }
+
+  var base = "/books/" + encodeURIComponent(book) + "/";
+  Promise.all([
+    fetch(base + "deck.json").then(function (r) { if (!r.ok) throw new Error("deck.json " + r.status); return r.json(); }),
+    // content.json は無くても動く(構造/本文分離): その場合はスライドID・種別のみ表示
+    fetch(base + "content.json").then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+  ]).then(function (res) {
+    var deck = res[0];
+    // プロトタイプ汚染耐性: 外部データ(スライドid)をキーにするためObject.create(null)にする
+    var content = Object.create(null);
+    if (res[1] && res[1].slides) {
+      Object.keys(res[1].slides).forEach(function (k) { content[k] = res[1].slides[k]; });
+    }
+
+    document.getElementById("hBook").textContent = deck.title || book;
+    if (!res[1]) {
+      warn("content.json が無いため、スライドは構成情報のみ表示しています。");
+    }
+    if ("mediaSession" in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: deck.title || book, artist: "kikimiru" });
+    }
+
+    document.getElementById("main").hidden = false;
+    var audio = document.getElementById("audio");
+
+    // audio.src の組み立て前にファイル名を検証する(パス区切り・親ディレクトリ参照・
+    // クエリ/フラグメントの混入を拒否し、意図しないリクエストになるのを防ぐ)
+    var audioName = (deck.audio && typeof deck.audio.src === "string" && deck.audio.src) || "audio.mp3";
+    if (/[\/\\]|\.\.|[?#]/.test(audioName)) {
+      warn("音声ファイル名が不正なため読み込みを中止しました: " + audioName);
+    } else {
+      // 音声のロード失敗(ファイル未検出・コーデック非対応等)を通知する
+      audio.addEventListener("error", function () {
+        warn("音声を読み込めませんでした: " + audioName);
+      });
+      audio.src = base + encodeURIComponent(audioName);
+    }
+
+    var cues = (deck.cues || []).slice().sort(function (a, b) { return a.t - b.t; });
+    if (!cues.length) {
+      // cuesが空のdeckはcues[0]参照で例外になりUIが半壊するため、ここで止める
+      warn("この本には再生可能なスライドがありません(deck.jsonのcuesが空です)");
+      return;
+    }
+
+    // プロトタイプ汚染耐性: 外部データ(スライドid)をキーにするためObject.create(null)にする
+    var slideMeta = Object.create(null);
+    (deck.slides || []).forEach(function (s) { if (s && s.id) slideMeta[s.id] = s; });
+    var cur = -1;
+
+    var slideEl = document.getElementById("slide");
+    function render(i) {
+      var cue = cues[i];
+      var meta = slideMeta[cue.slide] || {};
+      var body = content[cue.slide] || {};
+      var kind = safeKind(meta.kind);
+      slideEl.className = "kind-" + kind;
+      slideEl.innerHTML = '<div class="kind"></div><h2></h2>';
+      var kindLabel = { title: "タイトル", section: "セクション", question: "考えてみる" }[kind] || ("スライド " + (i + 1));
+      slideEl.querySelector(".kind").textContent = kindLabel;
+      slideEl.querySelector("h2").textContent = body.title || cue.slide;
+      if (body.bullets && body.bullets.length) {
+        var ul = document.createElement("ul");
+        body.bullets.forEach(function (b) {
+          var li = document.createElement("li");
+          li.textContent = b;
+          ul.appendChild(li);
+        });
+        slideEl.appendChild(ul);
+      }
+      if (body.note) {
+        var note = document.createElement("div");
+        note.className = "note";
+        note.textContent = body.note;
+        slideEl.appendChild(note);
+      }
+      document.getElementById("mSlide").textContent = "スライド " + (i + 1) + " / " + cues.length;
+      var items = document.querySelectorAll("#list .item");
+      items.forEach(function (el, j) { el.classList.toggle("cur", j === i); });
+      // #listは独立したスクロールコンテナ(CSSでmax-height+overflow-y:auto)のため、
+      // block:"nearest"はページ全体ではなく#list内のスクロールだけで完結する
+      if (items[i]) items[i].scrollIntoView({ block: "nearest" });
+    }
+
+    function cueAt(t) {
+      var i = 0;
+      while (i + 1 < cues.length && cues[i + 1].t <= t) i++;
+      return i;
+    }
+
+    audio.addEventListener("timeupdate", function () {
+      var i = cueAt(audio.currentTime);
+      if (i !== cur) { cur = i; render(i); }
+      document.getElementById("mTime").textContent =
+        fmt(audio.currentTime) + " / " + fmt(audio.duration || (deck.audio && deck.audio.duration) || 0);
+    });
+
+    function seekTo(i) {
+      audio.currentTime = cues[i].t + 0.01;
+      if (audio.paused) {
+        // 自動再生ブロック時のunhandled promise rejectionを防ぐ
+        audio.play().catch(function () {});
+      }
+    }
+    document.getElementById("prev").addEventListener("click", function () { seekTo(Math.max(0, cur - 1)); });
+    document.getElementById("next").addEventListener("click", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
+
+    if ("mediaSession" in navigator) {
+      // ロック画面/通知からの前後スライド送り(既存のprev/nextロジックを流用)
+      navigator.mediaSession.setActionHandler("previoustrack", function () { seekTo(Math.max(0, cur - 1)); });
+      navigator.mediaSession.setActionHandler("nexttrack", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
+    }
+
+    [0.75, 1.0, 1.25, 1.5, 2.0].forEach(function (v) {
+      var b = document.createElement("button");
+      b.textContent = "×" + v;
+      if (v === 1.0) b.classList.add("on");
+      b.addEventListener("click", function () {
+        document.getElementById("audio").playbackRate = v;
+        document.querySelectorAll("#speeds button").forEach(function (x) { x.classList.remove("on"); });
+        b.classList.add("on");
+      });
+      document.getElementById("speeds").appendChild(b);
+    });
+
+    var list = document.getElementById("list");
+    cues.forEach(function (cue, i) {
+      var body = content[cue.slide] || {};
+      var b = document.createElement("button");
+      b.className = "item";
+      b.innerHTML = '<span class="t"></span><span class="ttl"></span>';
+      b.querySelector(".t").textContent = fmt(cue.t);
+      b.querySelector(".ttl").textContent = body.title || cue.slide;
+      b.addEventListener("click", function () { seekTo(i); });
+      list.appendChild(b);
+    });
+
+    cur = 0;
+    render(0);
+  }).catch(function (e) {
+    document.getElementById("hBook").textContent = "読み込みエラー: " + e.message;
+  });
+})();
+</script>
+</body>
+</html>
