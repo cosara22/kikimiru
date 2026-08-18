@@ -112,6 +112,12 @@ def validate_v2_meta(deck: dict, errors: list, warnings: list) -> None:
     if "description" in deck and not is_str(deck["description"]):
         errors.append(
             f"deck.json: description は文字列である必要があります(実際: {deck['description']!r})")
+    elif "description" in deck and is_str(deck["description"]) and len(deck["description"]) > 400:
+        # 逐語転載ガード: descriptionは「書誌としての紹介文」であり書籍本文を置く場所ではない。
+        # 長文は本文引用の混入を疑うサイン(SCHEMA.mdの引用禁止規約の機械的な接地点)。ERRORにはしない
+        warnings.append(
+            f"deck.json: description が400字を超えています({len(deck['description'])}字)。"
+            f"本文の引用が混入していないか確認してください(紹介文は数文に収める)")
 
     # --- cover ---
     if "cover" in deck:

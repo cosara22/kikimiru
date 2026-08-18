@@ -121,22 +121,52 @@ v2 は v1 に**書誌メタデータ(著者・話者・シリーズ・タグ・�
 
 ## /api/books
 
-> **注記(Phase 1 作業中)**: ABS級のライブラリ体験(著者・シリーズ・話者の各画面)に向けて
-> **本エンドポイントをサーバ側で拡張中**である。v2の書誌メタデータ(著者名など)が
-> 応答に加わり、ライブラリ指定のパラメータも増える予定。
-> **以下の応答形状の記述は拡張前のものであり、確定版ではない。**
-> 実装完了後に本節を更新する。
-
-サーバの `GET /api/books` はライブラリ内の全ブックを次の形状で返す:
+サーバの `GET /api/books` はライブラリ内の全ブックを次の形状で返す(v2確定版):
 
 ```json
 {
-  "kikimiru": 1,
+  "kikimiru": 2,
+  "library": "demo",
   "books": [
-    { "id": "demo-book", "title": "kikimiru デモ — 同期の仕組み", "duration": 48.0, "slides": 6 }
+    {
+      "id": "demo-guide-1",
+      "library": "demo",
+      "title": "kikimiru の手引き 1 — スキーマの読み方",
+      "authors": ["サンプル・ラボ"],
+      "narrators": ["合成音サンプルA"],
+      "series": { "name": "kikimiru の手引き", "sequence": "1" },
+      "tags": ["デモ", "スキーマ", "入門"],
+      "description": "…",
+      "cover": "cover.png",
+      "addedAt": "2026-08-17",
+      "duration": 42.0,
+      "slides": 7
+    }
   ]
 }
 ```
+
+- クエリパラメータ: `library=`(ライブラリID・省略時は先頭) / `q=`(タイトル・著者・話者・
+  シリーズ・タグ・説明の部分一致検索) / `author=` `narrator=` `series=` `tag=`(完全一致絞り込み) /
+  `sort=`(`title`(既定)・`added`・`duration`・`series`)
+- v1のdeck(書誌フィールド無し)は `authors: []`・`series: null` 等の空値で返る(後方互換)
+
+### GET /api/books/&lt;id&gt;
+
+ブック単体の書誌を返す(詳細画面用・一覧と同じ形状の要素1件):
+
+```json
+{ "kikimiru": 2, "library": "demo", "book": { "id": "demo-guide-1", "…": "…" } }
+```
+
+存在しないIDは `404`。IDはファイル配信と同じ封じ込め規則(下記)で検査される。
+
+### 集計エンドポイント
+
+`GET /api/authors` / `/api/narrators` / `/api/series` / `/api/stats` / `/api/collections`
+(いずれも `library=` を受ける)。`stats` は
+`{books, duration, slides, authors, narrators, series, tags, withCover}` を返す。
+`collections` は `PUT` で全置換更新(1MiB上限・既知ブックIDのみ保存)。
 
 - `id`: **ブックフォルダ名そのもの**(`--library` 配下のディレクトリ名と一致する)。
   `deck.json` にIDフィールドは無い
