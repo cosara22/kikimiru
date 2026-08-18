@@ -33,7 +33,8 @@ LIBRARY = ROOT / "demo" / "library"
 COVER_NAME = "cover.png"
 COVER_SIZE = "512x512"
 
-# 表紙の配色。シリーズ2冊は同系色(藍→青緑)、単独本は暖色系にして一覧で見分けられるようにする。
+# 表紙の配色(UI再設計・案Dに同調)。シリーズ2冊は深い森×リーフグリーン、
+# 単独本はUIのquestionアクセントと同系の琥珀にして、近黒のUI上で静かに際立たせる。
 INK = "0xE9F5F2"   # 寒色系の図形色
 INK_WARM = "0xFFF3E0"  # 暖色系の図形色
 
@@ -100,9 +101,9 @@ BOOKS = [
             "description": "deck.json と content.json の役割を、デモ音声に合わせて1枚ずつ読み解く手引き。",
             "addedAt": "2026-08-17",
         },
-        # 藍→青緑の斜めグラデーション + 入れ子の四角(同心)
+        # 深い森→リーフグリーンの斜めグラデーション + 入れ子の四角(同心)
         "cover": (
-            f"gradients=s={COVER_SIZE}:c0=0x14213D:c1=0x2A9D8F"
+            f"gradients=s={COVER_SIZE}:c0=0x0F2A1E:c1=0x3E9268"
             ":x0=0:y0=0:x1=511:y1=511:n=2:t=linear:d=1"
             f",drawbox=x=96:y=96:w=320:h=320:color={INK}@0.85:t=8"
             f",drawbox=x=160:y=160:w=192:h=192:color={INK}@0.55:t=8"
@@ -156,7 +157,7 @@ BOOKS = [
         },
         # 1冊目と同じ2色を逆向きに使い、図形は階段状の柱に変える
         "cover": (
-            f"gradients=s={COVER_SIZE}:c0=0x2A9D8F:c1=0x14213D"
+            f"gradients=s={COVER_SIZE}:c0=0x3E9268:c1=0x0F2A1E"
             ":x0=511:y0=0:x1=0:y1=511:n=2:t=linear:d=1"
             f",drawbox=x=64:y=352:w=96:h=96:color={INK}@0.90:t=fill"
             f",drawbox=x=176:y=272:w=96:h=176:color={INK}@0.70:t=fill"
@@ -212,9 +213,9 @@ BOOKS = [
                            "自分のライブラリを作る前の練習台として、deck.json の書き方をここで一巡できる。",
             "addedAt": "2026-08-19",
         },
-        # 暖色の放射グラデーション + 格子 + 枠(シリーズ2冊と対照的な配色にする)
+        # 琥珀の放射グラデーション + 格子 + 枠(シリーズ2冊と対照的な配色にする)
         "cover": (
-            f"gradients=s={COVER_SIZE}:c0=0xF4A261:c1=0x8E2D5A"
+            f"gradients=s={COVER_SIZE}:c0=0xD9A86A:c1=0x3A2314"
             ":x0=256:y0=256:x1=511:y1=511:n=2:t=radial:d=1"
             f",drawgrid=w=64:h=64:t=2:color={INK_WARM}@0.25"
             f",drawbox=x=128:y=128:w=256:h=256:color={INK_WARM}@0.90:t=10"
