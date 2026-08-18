@@ -1,0 +1,64 @@
+name: publish-image
+
+# GHCRへのDockerイメージ公開(vX.Y.Z タグ push で発火)。
+# 私的情報の混入検査(release_gate)を必ず通過してからビルド・公開する —
+# ゲートを素通りする公開経路を作らない、というリポジトリ方針のイメージ配布への延長。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: release_gate
+        run: python tools/release_gate.py
+      - name: validate demo decks
+        run: |
+          for d in demo/library/*/; do
+            python tools/validate_deck.py "$d"
+          done
+      - name: unittest
+        run: python -m unittest discover -s tests
+
+  build-push:
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          # 純Python・COPYのみのためQEMUエミュレーションのコストはほぼゼロ
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true

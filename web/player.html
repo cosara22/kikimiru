@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>kikimiru</title>
+<link rel="manifest" href="/web/manifest.webmanifest">
+<meta name="theme-color" content="#0e0f11">
+<link rel="icon" href="/web/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/web/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="kikimiru">
 <style>
   /* =========================================================
      kikimiru — 案D「SoundLeaf参照」ネイティブアプリ文法・ダーク
@@ -440,6 +447,23 @@
     .transport { gap: 10px; }
   }
 
+  /* ---- ログインオーバーレイ ---- */
+  #login { position: fixed; inset: 0; z-index: 40; background: var(--bg);
+    display: flex; align-items: center; justify-content: center; padding: 24px; }
+  #login .panel { width: 340px; max-width: 100%; text-align: center; }
+  #login .mark { width: 56px; height: 56px; margin: 0 auto 14px; color: var(--tint); }
+  #login .mark svg { width: 100%; height: 100%; }
+  #login h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
+  #login p { font-size: 13px; color: var(--ink2); margin-bottom: 20px; }
+  #login input { width: 100%; background: var(--bg-elev); border: none;
+    border-radius: var(--r-field); padding: 12px 14px; color: var(--ink);
+    font-size: 15px; font-family: inherit; text-align: center; }
+  #login button { width: 100%; margin-top: 12px; background: var(--tint);
+    color: var(--on-tint); border-radius: 12px; padding: 13px 0;
+    font-size: 15px; font-weight: 700; transition: background-color .12s linear; }
+  #login button:hover { background: var(--tint-hi); }
+  #login .err { font-size: 12.5px; color: #e08f8f; margin-top: 12px; min-height: 1.2em; }
+
   /* 動きを減らす設定を尊重する */
   @media (prefers-reduced-motion: reduce) {
     * { transition: none !important; animation: none !important; }
@@ -525,9 +549,12 @@
     if (s) rec.s = s;
     if (n) rec.n = n;
     lsSet("kikimiru.pos." + lib + "/" + id, JSON.stringify(rec));
+    markDirty(lib, id);
   }
   function clearPos(lib, id) {
-    try { localStorage.removeItem("kikimiru.pos." + lib + "/" + id); } catch (e) {}
+    // 端末間同期(LWW)で古いサーバ値が復活しないよう、削除でなく
+    // ゼロ位置の墓標レコード(t:0,d:0,新しいat)を書いて同期させる
+    savePos(lib, id, 0, 0);
   }
   // 進捗の状態判定を1箇所に集約(カード・詳細・統計で同じ閾値を使う)
   var DONE_PCT = 0.97, START_PCT = 0.02;
@@ -553,9 +580,137 @@
     var p = new URLSearchParams(extra || {});
     if (state.lib) p.set("library", state.lib);
     return fetch(path + "?" + p.toString()).then(function (r) {
+      if (r.status === 401) {
+        // セッション切れ。ログイン画面を出して以降の処理は静かに打ち切る
+        showLogin();
+        throw new Error("auth_required");
+      }
       if (!r.ok) throw new Error(path + " " + r.status);
+      if (!offlineNotified && r.headers.get("X-Kikimiru-Cache")) {
+        // Service Workerのキャッシュから返された=サーバに届いていない
+        offlineNotified = true;
+        warn("オフライン表示: サーバに接続できないため、最後に取得した内容を表示しています。保存系の操作は失敗します。");
+      }
       return r.json();
     });
+  }
+
+  // ================= Service Worker =================
+  // secure context(https または 127.0.0.1)でのみ登録する。
+  // LANのhttp運用ではSWは動かないため静かにスキップ(通常動作に影響なし)
+  if ("serviceWorker" in navigator && window.isSecureContext) {
+    navigator.serviceWorker.register("/web/sw.js", { scope: "/web/" }).catch(function () {});
+  }
+  var offlineNotified = false;
+
+  // ================= ログイン =================
+  var loginShown = false;
+  function showLogin() {
+    if (loginShown) return;
+    loginShown = true;
+    var ov = el("div");
+    ov.id = "login";
+    var panel = el("div", "panel");
+    var mark = el("div", "mark");
+    mark.innerHTML = I.glyph;
+    panel.appendChild(mark);
+    panel.appendChild(el("h1", null, "kikimiru"));
+    panel.appendChild(el("p", null, "パスワードを入力してください"));
+    var form = document.createElement("form");
+    var box = document.createElement("input");
+    box.type = "password";
+    box.setAttribute("aria-label", "パスワード");
+    box.autocomplete = "current-password";
+    form.appendChild(box);
+    var btn = el("button", null, "ログイン");
+    btn.type = "submit";
+    form.appendChild(btn);
+    var err = el("div", "err", "");
+    form.appendChild(err);
+    form.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      err.textContent = "";
+      fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: box.value })
+      }).then(function (r) {
+        if (r.ok) { location.reload(); return; }
+        if (r.status === 429) {
+          err.textContent = "試行回数が多すぎます。しばらく待ってから再試行してください。";
+          return;
+        }
+        err.textContent = "パスワードが違います。";
+      }).catch(function () { err.textContent = "サーバに接続できません。"; });
+    });
+    panel.appendChild(form);
+    ov.appendChild(panel);
+    document.body.appendChild(ov);
+    setTimeout(function () { box.focus(); }, 0);
+  }
+
+  // ================= 進捗の端末間同期 =================
+  // localStorage が常に一次ストア。サーバとはLWW(atの新しい方)でマージする。
+  var dirtyProgress = {};
+  function markDirty(lib, id) { dirtyProgress[lib + "/" + id] = true; }
+
+  function forEachLocalPos(fn) {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf("kikimiru.pos.") === 0) {
+          var rec = null;
+          try { rec = JSON.parse(localStorage.getItem(k)); } catch (e) {}
+          if (rec) fn(k.slice("kikimiru.pos.".length), rec);
+        }
+      }
+    } catch (e) { /* localStorage不可の環境では同期しない */ }
+  }
+
+  function syncProgressDown() {
+    // サーバ→localStorage。ローカルの方が新しい分・ローカルにしか無い分はdirtyへ
+    return fetch("/api/progress").then(function (r) {
+      return r.ok ? r.json() : null;
+    }).then(function (d) {
+      if (!d || !d.progress) return;
+      Object.keys(d.progress).forEach(function (key) {
+        var rec = d.progress[key];
+        var raw = lsGet("kikimiru.pos." + key);
+        var local = null;
+        try { local = raw ? JSON.parse(raw) : null; } catch (e) {}
+        if (!local || (rec.at || 0) > (local.at || 0)) {
+          lsSet("kikimiru.pos." + key, JSON.stringify(rec));
+        } else if ((local.at || 0) > (rec.at || 0)) {
+          dirtyProgress[key] = true;
+        }
+      });
+      forEachLocalPos(function (key) {
+        if (!d.progress[key]) dirtyProgress[key] = true;
+      });
+      syncProgressUp();
+    }).catch(function () { /* オフライン等では手元の進捗のまま続行 */ });
+  }
+
+  function syncProgressUp(useKeepalive) {
+    var keys = Object.keys(dirtyProgress);
+    if (!keys.length) return;
+    var payload = {};
+    keys.forEach(function (key) {
+      var raw = lsGet("kikimiru.pos." + key);
+      try {
+        var rec = raw ? JSON.parse(raw) : null;
+        if (rec) payload[key] = rec;
+      } catch (e) {}
+    });
+    if (!Object.keys(payload).length) { dirtyProgress = {}; return; }
+    fetch("/api/progress", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ progress: payload }),
+      keepalive: !!useKeepalive
+    }).then(function (r) {
+      if (r.ok) dirtyProgress = {};
+    }).catch(function () { /* 失敗は次の機会に再送 */ });
   }
 
   function bookBase(lib, id) {
@@ -585,7 +740,8 @@
     nextSlide: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.5 5.9v12.2c0 .9 1 1.4 1.7 1l9.2-6.1c.7-.4.7-1.5 0-1.9L6.2 5c-.7-.5-1.7 0-1.7.9z"/><rect x="16.9" y="5.2" width="2.6" height="13.6" rx="1"/></svg>',
     back10: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5a9.5 9.5 0 1 1-8.4 5"/><path d="m9.2 3.8-2.6 6.7 6.7-1.3"/></svg>',
     fwd10: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5a9.5 9.5 0 1 0 8.4 5"/><path d="m20.8 3.8 2.6 6.7-6.7-1.3"/></svg>',
-    glyph: '<svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="10" width="22" height="17" rx="2.5"/><path d="M11 16h12M11 21h8"/><path d="M33 15v14M38 19v6"/></svg>'
+    glyph: '<svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="10" width="22" height="17" rx="2.5"/><path d="M11 16h12M11 21h8"/><path d="M33 15v14M38 19v6"/></svg>',
+    logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h7"/><path d="M16 8.5 19.5 12 16 15.5"/><path d="M10 12h9.5"/></svg>'
   };
 
   // ================= 状態 =================
@@ -991,6 +1147,14 @@
         var g2 = el("div", "group");
         g2.appendChild(groupRow("tag", "タグ", Object.keys(tagCount).length, qs({ view: "tags" })));
         g2.appendChild(groupRow("stats", "統計", d.books.length + "冊", qs({ view: "stats" })));
+        var lo = groupRow("logout", "ログアウト", null, "#");
+        lo.addEventListener("click", function (ev) {
+          ev.preventDefault();
+          fetch("/api/logout", { method: "POST" })
+            .then(function () { location.reload(); })
+            .catch(function () { location.reload(); });
+        });
+        g2.appendChild(lo);
         bg.appendChild(g2);
         secB.appendChild(bg);
         cols.appendChild(secB);
@@ -1678,17 +1842,40 @@
       document.getElementById("prev").addEventListener("click", function () { seekTo(Math.max(0, cur - 1)); });
       document.getElementById("next").addEventListener("click", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
 
+      // ロック画面のスクラバー対応(位置情報の通知。5秒間引きで十分)
+      function updatePositionState() {
+        if (!("mediaSession" in navigator) || !("setPositionState" in navigator.mediaSession)) return;
+        var d = dur();
+        if (!d) return;
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: d,
+            playbackRate: audio.playbackRate,
+            position: Math.min(audio.currentTime, d)
+          });
+        } catch (e) { /* 一部環境の引数検証エラーは無視 */ }
+      }
+
       if ("mediaSession" in navigator) {
         navigator.mediaSession.setActionHandler("previoustrack", function () { seekTo(Math.max(0, cur - 1)); });
         navigator.mediaSession.setActionHandler("nexttrack", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
         try {
+          navigator.mediaSession.setActionHandler("play", function () { audio.play().catch(function () {}); });
+          navigator.mediaSession.setActionHandler("pause", function () { audio.pause(); });
           navigator.mediaSession.setActionHandler("seekbackward", function () {
             audio.currentTime = Math.max(0, audio.currentTime - 10);
           });
           navigator.mediaSession.setActionHandler("seekforward", function () {
             audio.currentTime = Math.min(dur() || Infinity, audio.currentTime + 10);
           });
+          navigator.mediaSession.setActionHandler("seekto", function (detail) {
+            if (detail.fastSeek && "fastSeek" in audio) { audio.fastSeek(detail.seekTime); }
+            else { audio.currentTime = detail.seekTime; }
+            updatePositionState();
+          });
         } catch (e) { /* 未対応環境は無視 */ }
+        audio.addEventListener("loadedmetadata", updatePositionState);
+        audio.addEventListener("ratechange", updatePositionState);
       }
 
       // ---- キーボード操作(Space=再生/停止・←→=前後スライド) ----
@@ -1717,6 +1904,7 @@
         if (now - lastSaved > 5000 && !audio.paused) {
           lastSaved = now;
           savePos(lib, bookId, audio.currentTime, dur(), cur + 1, cues.length);
+          updatePositionState();
         }
       });
       // 離脱時にも保存する(モバイルSafariはunloadが来ないためpagehide/visibilitychangeで)
@@ -1730,6 +1918,12 @@
         if (document.visibilityState === "hidden") saveNow();
       });
       audio.addEventListener("pause", saveNow);
+
+      // 端末間同期: 再生中は30秒ごと、停止・離脱時は即時に送る
+      // (saveNow が先に登録済みのため、送信時にはdirtyが最新化されている)
+      setInterval(function () { if (!audio.paused) syncProgressUp(); }, 30000);
+      audio.addEventListener("pause", function () { syncProgressUp(); });
+      window.addEventListener("pagehide", function () { syncProgressUp(true); });
 
       // ---- 前回の続きから再開(先頭・末尾付近の保存値は無視する) ----
       // ?restart=1(詳細画面の「最初から再生」)なら保存値を破棄して先頭から
@@ -1777,7 +1971,11 @@
   }
 
   // ================= 起動 =================
-  fetch("/api/libraries").then(function (r) { return r.json(); }).then(function (d) {
+  fetch("/api/libraries").then(function (r) {
+    if (r.status === 401) { showLogin(); return null; }
+    return r.json();
+  }).then(function (d) {
+    if (!d) return;  // ログイン待ち
     var libs = d.libraries || [];
     if (!libs.length) {
       warn("ライブラリがありません。--library でブックフォルダのディレクトリを指定してください。");
@@ -1791,22 +1989,25 @@
     renderShell();
     initLibSelect(libs);
 
-    var book = params.get("book");
-    switch (state.view) {
-      case "player": viewPlayer(book); return;  // 没入画面: ドックは出さない
-      case "book": viewBook(book); break;
-      case "library": viewLibrary(); break;
-      case "series": viewSeries(); break;
-      case "search": viewSearch(); break;
-      case "authors": viewPeople("authors"); break;
-      case "narrators": viewPeople("narrators"); break;
-      case "tags": viewTags(); break;
-      case "stats": viewStats(); break;
-      case "collections": viewCollections(); break;
-      default: state.view = "home"; renderShell(); viewHome();
-    }
-    // 再開ドック(プレイヤー以外の全画面)
-    api("/api/books").then(function (d) { renderDock(d.books); }).catch(function () {});
+    // 進捗をサーバとマージしてから描画する(続きから・ドックが端末横断で揃う)
+    syncProgressDown().then(function () {
+      var book = params.get("book");
+      switch (state.view) {
+        case "player": viewPlayer(book); return;  // 没入画面: ドックは出さない
+        case "book": viewBook(book); break;
+        case "library": viewLibrary(); break;
+        case "series": viewSeries(); break;
+        case "search": viewSearch(); break;
+        case "authors": viewPeople("authors"); break;
+        case "narrators": viewPeople("narrators"); break;
+        case "tags": viewTags(); break;
+        case "stats": viewStats(); break;
+        case "collections": viewCollections(); break;
+        default: state.view = "home"; renderShell(); viewHome();
+      }
+      // 再開ドック(プレイヤー以外の全画面)
+      api("/api/books").then(function (d2) { renderDock(d2.books); }).catch(function () {});
+    });
   }).catch(function () {
     warn("サーバに接続できません。");
   });

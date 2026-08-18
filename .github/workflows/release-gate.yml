@@ -20,5 +20,10 @@ jobs:
           python-version: "3.12"
       - name: release_gate
         run: python tools/release_gate.py
-      - name: validate demo deck
-        run: python tools/validate_deck.py demo/library/demo-book
+      - name: validate demo decks (全冊)
+        run: |
+          for d in demo/library/*/; do
+            python tools/validate_deck.py "$d"
+          done
+      - name: unittest
+        run: python -m unittest discover -s tests -v

@@ -1,0 +1,28 @@
+# kikimiru の docker-compose 例(安全側の既定)。
+# 初回はパスワード設定が必要:
+#   docker compose run --rm kikimiru --set-password
+# その後:
+#   docker compose up -d
+services:
+  kikimiru:
+    image: ghcr.io/cosara22/kikimiru:latest
+    # ローカルでビルドする場合は image の代わりに:
+    # build: .
+    ports:
+      # 既定は安全側: ホストの127.0.0.1のみに公開する。
+      # LANへ公開する場合は "8484:8484" に変え、docs/DEPLOY.md のTLS手引きを読むこと
+      - "127.0.0.1:8484:8484"
+    volumes:
+      - ./library:/library:rw          # ライブラリ(コレクション保存のため rw 推奨)
+      - kikimiru-state:/state          # 認証・セッション・進捗
+    command: ["--library", "本棚=/library"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    init: true
+    restart: unless-stopped
+    # NAS等でライブラリの所有者がUID 10001と合わず書き込みに失敗する場合は上書きする:
+    # user: "1000:1000"
+
+volumes:
+  kikimiru-state:
