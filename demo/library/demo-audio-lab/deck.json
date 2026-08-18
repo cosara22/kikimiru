@@ -12,7 +12,7 @@
     "音声合成",
     "ffmpeg"
   ],
-  "description": "ffmpeg の正弦波と lavfi の図形だけでデモ用ブックを組み立てる手順のメモ。",
+  "description": "ffmpeg の正弦波と lavfi の図形だけでデモ用ブックを組み立てる手順のメモ。音声は sine フィルタで合成し、表紙は geq と drawbox の組み合わせで描く。外部素材を一切使わないため、生成し直しても常に同じ見た目と長さになる。自分のライブラリを作る前の練習台として、deck.json の書き方をここで一巡できる。",
   "cover": "cover.png",
   "addedAt": "2026-08-19",
   "audio": {

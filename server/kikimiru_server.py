@@ -388,12 +388,20 @@ class KikimiruHandler(BaseHTTPRequestHandler):
 
         if path in ("/", "/player"):
             self.send_response(302)
-            self.send_header("Location", "/web/player.html")
+            # deep link(/?view=stats 等)を殺さないよう、クエリをそのまま引き継ぐ。
+            # raw_query は未デコードのままヘッダへ載せる(デコードすると
+            # %0d%0a 等によるヘッダ注入が復活するため、ここでは絶対にしない)
+            location = "/web/player.html"
+            if raw_query:
+                location += "?" + raw_query
+            self.send_header("Location", location)
             self.send_header("Content-Length", "0")
             self.end_headers()
             return
         if path == "/api/libraries":
             return self.api_libraries(send_body)
+        if path.startswith("/api/books/"):
+            return self.api_book(path[len("/api/books/"):], query, send_body)
         if path == "/api/books":
             return self.api_books(query, send_body)
         if path == "/api/authors":
@@ -487,6 +495,20 @@ class KikimiruHandler(BaseHTTPRequestHandler):
             books = sorted(books, key=lambda b: b["title"])
 
         self.send_json({"kikimiru": 2, "library": lib.id, "books": books}, send_body=send_body)
+
+    def api_book(self, book_id: str, query: dict, send_body: bool):
+        """ブック単体の書誌を返す(詳細画面用)。一覧と同じ形状の要素1件。"""
+        lib = self._pick_library(query)
+        if lib is None:
+            return self.send_error(404, explain="ライブラリが見つかりません")
+        # ブックIDはファイル配信と同じ封じ込め規則で検査する(traversal文字列の拒否)
+        if not is_safe_segment(book_id):
+            return self.send_error(400, explain="ブックIDが不正です")
+        for b in lib.books():
+            if b["id"] == book_id:
+                return self.send_json({"kikimiru": 2, "library": lib.id, "book": b},
+                                      send_body=send_body)
+        return self.send_error(404, explain="ブックが見つかりません")
 
     def api_people(self, query: dict, field: str, send_body: bool):
         """著者(authors)/話者(narrators)の一覧を集計して返す。"""
