@@ -77,6 +77,22 @@ class ReleaseGateTestCase(unittest.TestCase):
         r = self._run_gate()
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
+    def test_media_under_docs_screenshots_allowed(self):
+        # README掲載用スクリーンショットの置き場所(出所台帳つきなら合格)
+        self._write("docs/screenshots/home.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
+        self._write("docs/screenshots/SOURCES.md", "home.png: dummy".encode("utf-8"))
+        self._commit_all()
+        r = self._run_gate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_media_in_screenshots_requires_ledger(self):
+        # 出所台帳(SOURCES.md)が無ければ docs/screenshots/ でも不合格
+        self._write("docs/screenshots/home.png", b"\x89PNG\r\n\x1a\n" + b"\x00" * 8)
+        self._commit_all()
+        r = self._run_gate()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("SOURCES.md", r.stdout)
+
     def test_gate_config_and_generator_are_not_flagged(self):
         # tools/release_gate.py と tools/release_gate_config.json 自身が
         # 誤検知されないこと(平文を持たない設計であることの確認)
