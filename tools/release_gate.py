@@ -42,8 +42,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "tools" / "release_gate_config.json"
 
 # メディアファイルを置いてよいディレクトリ(いずれも SOURCES.md 出所台帳が必須)。
-# demo/ = 同梱デモ素材、docs/screenshots/ = README掲載用のUIスクリーンショット
-MEDIA_ALLOWED_PREFIXES = ("demo/", "docs/screenshots/")
+# demo/ = 同梱デモ素材、docs/screenshots/ = README掲載用のUIスクリーンショット、
+# web/ = PWAアイコン等の配信素材(tools/make_icons.py による自作生成)
+MEDIA_ALLOWED_PREFIXES = ("demo/", "docs/screenshots/", "web/")
 
 # 拡張子は判断材料にせず、実データ(マジックバイト)で既知メディアかどうかを判定する
 _FTYP_OFFSET = 4
