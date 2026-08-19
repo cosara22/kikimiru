@@ -15,10 +15,10 @@ This keeps the copyright consolidated so the project can adjust licensing later
 
 ## Clean-room rule
 
-This project deliberately contains **no code from Audiobookshelf** (GPL-3.0) or other
-third-party media servers. Do not copy, port, or closely paraphrase code from such
-projects — independent implementations only. Interoperability based on publicly
-documented APIs/protocols is fine.
+This project deliberately contains **no code from third-party media servers**
+(including GPL-licensed ones). Do not copy, port, or closely paraphrase code from
+such projects — independent implementations only. Interoperability based on
+publicly documented APIs/protocols is fine.
 
 ## Release gate
 
