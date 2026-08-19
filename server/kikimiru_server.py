@@ -72,6 +72,7 @@ WEB_ALLOWLIST = {
     # ため send_web 側で Cache-Control: no-cache を付ける
     "manifest.webmanifest": (WEB_DIR / "manifest.webmanifest", "application/manifest+json; charset=utf-8"),
     "sw.js": (WEB_DIR / "sw.js", "text/javascript; charset=utf-8"),
+    "icon-32.png": (WEB_DIR / "icon-32.png", "image/png"),
     "icon-192.png": (WEB_DIR / "icon-192.png", "image/png"),
     "icon-512.png": (WEB_DIR / "icon-512.png", "image/png"),
     "icon-maskable-512.png": (WEB_DIR / "icon-maskable-512.png", "image/png"),
@@ -1235,7 +1236,7 @@ def main() -> None:
     if args.set_password:
         sys.exit(set_password_interactive(args.state_dir))
 
-    # 認証は必須(CP1承認: Q1=常に必須)。未設定なら手順を示して起動を拒否する
+    # 認証は必須。未設定なら手順を示して起動を拒否する
     auth = load_auth(args.state_dir)
     if auth is None:
         print("エラー: パスワードが設定されていません。先に次を実行してください:")

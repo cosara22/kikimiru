@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  kikimiru ロゴマーク。
+  ヘッドフォン(聞く)がスクリーン(見る)を抱え、その面の上で本文の行と音の波形が並ぶ。
+  deck.json の時間軸に content.json の本文が乗る、という構造をそのまま形にしている。
+
+  座標系は 48x48。形は採用案 (reviews/2026-08-19_logo-proposals/gen/g3f.png) を実測して
+  写したもので、線幅も本数も原案どおり。細い線と13本の波形が意匠の要なので、
+  読みやすさのために太らせない。小さいサイズ用の簡略版は別に持つ
+  (tools/make_icons.py の simple / player.html の glyphSmall)。
+
+  tools/make_icons.py と web/player.html の glyph も同じ形を写しているので、
+  ここを変えたら3か所とも直すこと。
+  配色は player.html の同名トークンに対応する (ink / tint / 地は bg)。
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48"
+     role="img" aria-label="kikimiru">
+  <style>
+    .ink { stroke: #232019; }
+    .tint { stroke: #2f6093; }
+    @media (prefers-color-scheme: dark) {
+      .ink { stroke: #e7e3da; }
+      .tint { stroke: #6ea4dc; }
+    }
+  </style>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- ヘッドフォン: ヘッドバンドとイヤーカップ -->
+    <g class="ink">
+      <path d="M10.32 29.5V21.67a13.58 13.58 0 0 1 27.16 0V29.5" stroke-width="1.35"/>
+      <rect x="7.8" y="24.9" width="4.75" height="9.2" rx="2" stroke-width="1.05"/>
+      <rect x="35.25" y="24.9" width="4.75" height="9.2" rx="2" stroke-width="1.05"/>
+    </g>
+    <!-- スクリーン: レール・面・引き手 -->
+    <g class="tint">
+      <path d="M13.55 17.72h20.72" stroke-width="1.5"/>
+      <path d="M14.49 18.2v14.3a1.8 1.8 0 0 0 1.8 1.8h15.21a1.8 1.8 0 0 0 1.8-1.8V18.2"
+            stroke-width="0.98"/>
+      <path d="M23.9 34.3v2.54" stroke-width="0.94"/>
+      <circle cx="23.9" cy="37.99" r="1.15" stroke-width="0.84"/>
+    </g>
+    <!-- 面の上の中身: 本文の行と音の波形 (13本) -->
+    <g class="ink">
+      <path d="M17.76 22.64h12.34" stroke-width="1.12"/>
+      <path d="M17.61 27.35v1.92M18.68 26.27v4.08M19.62 27.63v1.36M20.63 26.79v3.04M21.68 25.59v5.44M22.76 26.64v3.34M23.84 27.44v1.74M24.87 27.25v2.12M25.97 26.46v3.7M27.03 25.75v5.12M28.11 27.09v2.44M29.14 26.62v3.38M30.24 27.31v2"
+            stroke-width="0.66"/>
+    </g>
+  </g>
+</svg>

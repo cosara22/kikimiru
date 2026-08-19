@@ -7,8 +7,8 @@
   "display": "standalone",
   "orientation": "any",
   "lang": "ja",
-  "background_color": "#0e0f11",
-  "theme_color": "#0e0f11",
+  "background_color": "#131519",
+  "theme_color": "#131519",
   "description": "スライド同期機能付きの self-host 音声プレイヤー",
   "icons": [
     { "src": "/web/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
