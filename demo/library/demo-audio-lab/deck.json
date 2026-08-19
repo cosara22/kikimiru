@@ -23,23 +23,28 @@
   "slides": [
     {
       "id": "s1",
-      "kind": "title"
+      "kind": "title",
+      "image": "slides/s1.png"
     },
     {
       "id": "s2",
-      "kind": "content"
+      "kind": "content",
+      "image": "slides/s2.png"
     },
     {
       "id": "s3",
-      "kind": "content"
+      "kind": "content",
+      "image": "slides/s3.png"
     },
     {
       "id": "s4",
-      "kind": "content"
+      "kind": "content",
+      "image": "slides/s4.png"
     },
     {
       "id": "s5",
-      "kind": "question"
+      "kind": "question",
+      "image": "slides/s5.png"
     }
   ],
   "cues": [

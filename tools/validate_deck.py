@@ -24,6 +24,8 @@ from datetime import date, datetime
 from pathlib import Path
 
 VALID_KINDS = {"title", "section", "content", "question"}
+# v2.1: 画像スライド(slides[].image)で許可する拡張子(サーバ配信allowlistと同期)
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
 MAX_BULLETS = 5
 MAX_BULLET_CHARS = 40
 
@@ -204,6 +206,7 @@ def validate_deck(deck, errors: list, warnings: list) -> set:
     # --- slides ---------------------------------------------------------
     slides = deck.get("slides")
     slide_ids = set()
+    image_slide_ids = set()
     if not isinstance(slides, list):
         errors.append("deck.json: slides は配列である必要があります")
         slides = []
@@ -223,6 +226,29 @@ def validate_deck(deck, errors: list, warnings: list) -> set:
             errors.append(
                 f"deck.json: slides[{i}].kind は {sorted(VALID_KINDS)} のいずれかである必要があります"
                 f"(実際: {kind!r})")
+
+        # v2.1: 画像スライド(任意)。ブックフォルダ内の相対パス(最大2セグメント)のみ許可
+        image = s.get("image")
+        if image is not None:
+            if not is_str(image) or not image:
+                errors.append(
+                    f"deck.json: slides[{i}].image は空でない文字列である必要があります"
+                    f"(実際: {image!r})")
+            else:
+                segs = image.split("/")
+                bad = (len(segs) > 2 or any(
+                    not seg or seg.startswith(".") or "\\" in seg or ".." in seg
+                    for seg in segs))
+                if bad:
+                    errors.append(
+                        f"deck.json: slides[{i}].image はブックフォルダ内の相対パス"
+                        f"(最大2セグメント・'..'や'\\'を含まない)である必要があります: {image!r}")
+                elif Path(segs[-1]).suffix.lower() not in IMAGE_EXTENSIONS:
+                    errors.append(
+                        f"deck.json: slides[{i}].image の拡張子は "
+                        f"{sorted(IMAGE_EXTENSIONS)} のいずれかである必要があります: {image!r}")
+                elif is_str(sid) and sid:
+                    image_slide_ids.add(sid)
 
     # --- cues -------------------------------------------------------------
     cues = deck.get("cues")
@@ -259,11 +285,18 @@ def validate_deck(deck, errors: list, warnings: list) -> set:
     if cues and first_valid_t is not None and first_valid_t != 0.0:
         errors.append(f"deck.json: cues[0].t は 0.0 である必要があります(実際: {first_valid_t})")
 
-    return slide_ids
+    return slide_ids, image_slide_ids
 
 
-def validate_content(content, errors: list, warnings: list) -> None:
-    """content.json(本文データ)を検証する。bulletsの件数/文字数上限は警告に留める。"""
+def validate_content(content, errors: list, warnings: list,
+                     image_slide_ids: set = frozenset()) -> None:
+    """content.json(本文データ)を検証する。bulletsの件数/文字数上限は警告に留める。
+
+    image_slide_ids には deck.json 側で画像を持つスライドIDを渡す。
+    画像スライドに意味層(alt または bullets)が無い場合はWARNを出す
+    (画像・グラフをピクセルだけにせず、検索・読み上げ・共有時の
+    テキスト代替に使えるセマンティックレイヤーを持たせる規約)。
+    """
     if not isinstance(content, dict):
         errors.append("content.json: トップレベルはオブジェクトである必要があります")
         return
@@ -309,6 +342,20 @@ def validate_content(content, errors: list, warnings: list) -> None:
         if note is not None and not is_str(note):
             errors.append(f"content.json: slides[{sid!r}].note は文字列またはnullである必要があります(実際: {note!r})")
 
+        # v2.1: alt = 画像スライドの意味説明(セマンティックレイヤー)。任意・文字列
+        alt = body.get("alt")
+        if alt is not None and not is_str(alt):
+            errors.append(f"content.json: slides[{sid!r}].alt は文字列である必要があります(実際: {alt!r})")
+
+        # 画像スライドなのに意味層が空の場合は警告(規約の機械的な接地点)
+        if sid in image_slide_ids:
+            has_alt = is_str(alt) and alt.strip()
+            has_bullets = isinstance(bullets, list) and any(is_str(b) and b.strip() for b in bullets)
+            if not has_alt and not has_bullets:
+                warnings.append(
+                    f"content.json: slides[{sid!r}] は画像スライドですが意味層(alt/bullets)が"
+                    f"ありません。図やグラフの内容をテキストで併記してください")
+
 
 def main() -> int:
     if len(sys.argv) != 2:
@@ -321,14 +368,15 @@ def main() -> int:
 
     deck = load_json(book / "deck.json", errors)
     slide_ids = set()
+    image_slide_ids = set()
     if deck is not None:
-        slide_ids = validate_deck(deck, errors, warnings)
+        slide_ids, image_slide_ids = validate_deck(deck, errors, warnings)
 
     content_path = book / "content.json"
     if content_path.is_file():
         content = load_json(content_path, errors)
         if content is not None:
-            validate_content(content, errors, warnings)
+            validate_content(content, errors, warnings, image_slide_ids)
     # content.json はSCHEMA.mdの設計上「無くても構成のみで動作する」任意ファイルのため、
     # 存在しなくてもエラーにしない。
 

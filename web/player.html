@@ -354,6 +354,13 @@
   #slide.kind-title li::before, #slide.kind-section li::before { content: ""; }
   #slide.kind-question .kind, #slide.kind-question li::before { color: #d9a86a; }
   #slide.kind-question .kind::before { background: #d9a86a; }
+  /* 画像スライド(v2.1): 16:9等の画像を余白レターボックスで全面表示。
+     テキスト面は隠す(意味層は img の alt が担持し、画像ロード失敗時は
+     has-img が付かないためテキスト面がそのまま見える) */
+  #slide.has-img { padding: 0; background: #0a0b0d; justify-content: stretch; }
+  #slide.has-img > :not(.slide-img) { visibility: hidden; }
+  #slide .slide-img { position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: contain; }
 
   .counter { text-align: center; font-size: 12.5px; color: var(--ink3);
     margin: 14px 0 10px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
@@ -1708,6 +1715,25 @@
 
       // ---- スライド描画 ----
       var slideEl = document.getElementById("slide");
+
+      // 画像スライド(v2.1)のパス検証とURL化。各セグメントを個別に検査・エンコード
+      function slideImageUrl(image) {
+        if (typeof image !== "string" || !image) return null;
+        var segs = image.split("/");
+        if (segs.length > 2) return null;
+        for (var k = 0; k < segs.length; k++) {
+          if (!segs[k] || segs[k].charAt(0) === "." ||
+              /\\|\.\.|[?#]/.test(segs[k])) return null;
+        }
+        return base + segs.map(encodeURIComponent).join("/");
+      }
+      function prefetchSlideImage(i) {
+        if (i < 0 || i >= cues.length) return;
+        var sm2 = slideMeta[cues[i].slide] || {};
+        var url = slideImageUrl(sm2.image);
+        if (url) { var im = new Image(); im.src = url; }
+      }
+
       function render(i) {
         var cue = cues[i];
         var sm = slideMeta[cue.slide] || {};
@@ -1731,6 +1757,21 @@
           slideEl.appendChild(ul);
         }
         if (body.note) slideEl.appendChild(el("div", "note", body.note));
+
+        // 画像スライド: テキスト面の上に全面表示。意味層(alt/本文)は読み上げ・
+        // 検索・画像ロード失敗時のフォールバックとして機能する
+        var imgUrl = slideImageUrl(sm.image);
+        if (imgUrl) {
+          var img = document.createElement("img");
+          img.className = "slide-img";
+          img.alt = (typeof body.alt === "string" && body.alt) || body.title || cue.slide;
+          img.addEventListener("load", function () { slideEl.classList.add("has-img"); });
+          // ロード失敗時はテキスト面がそのまま見える(has-imgを付けない)
+          img.addEventListener("error", function () { img.remove(); });
+          img.src = imgUrl;
+          slideEl.appendChild(img);
+        }
+        prefetchSlideImage(i + 1);
         document.getElementById("mSlide").textContent = String(i + 1);
         // フィルムストリップの状態更新
         var thumbs = document.querySelectorAll("#strip .thumb");

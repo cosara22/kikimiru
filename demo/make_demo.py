@@ -32,6 +32,7 @@ LIBRARY = ROOT / "demo" / "library"
 
 COVER_NAME = "cover.png"
 COVER_SIZE = "512x512"
+SLIDE_IMG_SIZE = "1280x720"  # 画像スライド(v2.1)のデモ用サイズ(16:9)
 
 # 表紙の配色(UI再設計・案Dに同調)。シリーズ2冊は深い森×リーフグリーン、
 # 単独本はUIのquestionアクセントと同系の琥珀にして、近黒のUI上で静かに際立たせる。
@@ -213,6 +214,8 @@ BOOKS = [
                            "自分のライブラリを作る前の練習台として、deck.json の書き方をここで一巡できる。",
             "addedAt": "2026-08-19",
         },
+        # 画像スライド(v2.1)のデモを兼ねる: 全スライドに幾何学画像+意味層(alt)を持たせる
+        "slide_images": True,
         # 琥珀の放射グラデーション + 格子 + 枠(シリーズ2冊と対照的な配色にする)
         "cover": (
             f"gradients=s={COVER_SIZE}:c0=0xD9A86A:c1=0x3A2314"
@@ -327,7 +330,35 @@ def build_cover(book_dir: pathlib.Path, cover_filter: str) -> str:
     return COVER_NAME
 
 
-def build_deck(book: dict, cover_name, duration: float, sha: str) -> dict:
+def build_slide_images(book_dir: pathlib.Path, timeline) -> dict:
+    """画像スライド(v2.1デモ)を lavfi の図形だけで描く。sid→相対パスの辞書を返す。
+
+    琥珀系グラデーション地に白い枠、下段にスライド進行度を示す正方形の列
+    (i枚目= i+1個)という決定論の構図。外部素材・文字描画は使わない。
+    """
+    out_dir = book_dir / "slides"
+    out_dir.mkdir(exist_ok=True)
+    names = {}
+    for i, (_, sid, *_rest) in enumerate(timeline):
+        boxes = "".join(
+            f",drawbox=x={80 + k * 90}:y=580:w=60:h=60:color=0xFFF3E0@0.9:t=fill"
+            for k in range(i + 1))
+        filt = (
+            f"gradients=s={SLIDE_IMG_SIZE}:c0=0x2B1A10:c1=0x8A5A2E"
+            ":x0=0:y0=0:x1=1279:y1=719:n=2:t=linear:d=1"
+            ",drawbox=x=80:y=80:w=1120:h=440:color=0xFFF3E0@0.85:t=6"
+            f",drawbox=x=560:y=260:w=160:h=80:color=0xFFF3E0@0.9:t=fill"
+            + boxes)
+        run_checked([
+            "ffmpeg", "-y", "-f", "lavfi",
+            "-i", f"{filt},format=rgb24",
+            "-frames:v", "1", str(out_dir / f"{sid}.png")])
+        names[sid] = f"slides/{sid}.png"
+    return names
+
+
+def build_deck(book: dict, cover_name, duration: float, sha: str,
+               slide_image_names: dict = None) -> dict:
     """deck.json の中身を組み立てる。
 
     キーの並びは docs/SCHEMA.md の記載順に合わせる。v2の書誌フィールドは
@@ -346,21 +377,32 @@ def build_deck(book: dict, cover_name, duration: float, sha: str) -> dict:
     seg_sec = book["seg_sec"]
     timeline = book["timeline"]
     deck["audio"] = {"src": "audio.mp3", "duration": round(duration, 3), "sha256": sha}
-    deck["slides"] = [{"id": sid, "kind": kind} for _, sid, kind, *_ in timeline]
+    slide_image_names = slide_image_names or {}
+    deck["slides"] = [
+        ({"id": sid, "kind": kind, "image": slide_image_names[sid]}
+         if sid in slide_image_names else {"id": sid, "kind": kind})
+        for _, sid, kind, *_ in timeline]
     deck["cues"] = [{"t": float(i * seg_sec), "slide": sid}
                     for i, (_, sid, *_rest) in enumerate(timeline)]
     return deck
 
 
-def build_content(timeline) -> dict:
-    """content.json(本文)の中身を組み立てる。本文の版はv1のまま(v2の追加は deck 側のみ)。"""
-    return {
-        "kikimiru": 1,
-        "slides": {
-            sid: {"title": title, "bullets": bullets, "note": note}
-            for _, sid, _kind, title, bullets, note in timeline
-        },
-    }
+def build_content(timeline, schema: int, with_image_alt: bool = False) -> dict:
+    """content.json(本文)の中身を組み立てる。版番号は deck と揃える(SCHEMA.md推奨)。
+
+    with_image_alt が真のとき、各スライドに画像の意味層(alt)を付ける
+    (画像スライドはピクセルだけにせず、内容をテキストで併記する規約のデモ)。
+    """
+    slides = {}
+    for i, (_, sid, _kind, title, bullets, note) in enumerate(timeline):
+        body = {"title": title, "bullets": bullets, "note": note}
+        if with_image_alt:
+            body["alt"] = (
+                f"デモの幾何学スライド画像({i + 1}枚目)。琥珀系のグラデーション地に"
+                f"白い枠と中央の矩形、下段にスライド進行度を示す正方形が{i + 1}個並ぶ。"
+                f"内容は「{title}」。")
+        slides[sid] = body
+    return {"kikimiru": schema, "slides": slides}
 
 
 def write_json(path: pathlib.Path, data: dict) -> None:
@@ -374,10 +416,14 @@ def build_book(book: dict) -> dict:
 
     duration, sha = build_audio(book_dir, book["timeline"], book["seg_sec"])
     cover_name = build_cover(book_dir, book["cover"]) if book["cover"] else None
+    slide_image_names = (build_slide_images(book_dir, book["timeline"])
+                         if book.get("slide_images") else None)
 
-    deck = build_deck(book, cover_name, duration, sha)
+    deck = build_deck(book, cover_name, duration, sha, slide_image_names)
     write_json(book_dir / "deck.json", deck)
-    write_json(book_dir / "content.json", build_content(book["timeline"]))
+    write_json(book_dir / "content.json",
+               build_content(book["timeline"], book["schema"],
+                             with_image_alt=bool(slide_image_names)))
 
     return {
         "id": book["id"],
