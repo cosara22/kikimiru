@@ -1,6 +1,6 @@
 /* kikimiru Service Worker — 依存ゼロ・単一ファイル。
  *
- * 方針(CP1承認済み設計B):
+ * 方針:
  * - シェル(player.html+manifest+アイコン)はプリキャッシュし、版数で世代管理する
  * - ナビゲーションは network-first(3秒タイムアウト)→ キャッシュのシェルを返す
  *   (クエリルーティングのためシェル1枚で全画面を復元できる)
@@ -15,10 +15,11 @@
 
 // UI(player.html)やシェル部品を更新したら必ずこの版数を上げる。
 // activate で旧世代のキャッシュを削除するため、端末側の古いシェルが確実に入れ替わる。
-const CACHE_VERSION = "kikimiru-v2";
+const CACHE_VERSION = "kikimiru-v4";
 const SHELL = [
   "/web/player.html",
   "/web/manifest.webmanifest",
+  "/web/icon-32.png",
   "/web/icon-192.png",
   "/web/icon-512.png",
   "/web/icon-maskable-512.png",

@@ -5,21 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>kikimiru</title>
 <link rel="manifest" href="/web/manifest.webmanifest">
-<meta name="theme-color" content="#0e0f11">
-<link rel="icon" href="/web/icon-192.png" type="image/png">
+<meta name="theme-color" content="#131519">
+<link rel="icon" href="/web/icon-32.png" sizes="32x32" type="image/png">
+<link rel="icon" href="/web/icon-192.png" sizes="192x192" type="image/png">
 <link rel="apple-touch-icon" href="/web/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="kikimiru">
 <style>
   /* =========================================================
-     kikimiru — 案D「SoundLeaf参照」ネイティブアプリ文法・ダーク
+     kikimiru — 単一ファイルのライブラリ+プレイヤーUI(ネイティブアプリ文法)
      Large Title / 水平カルーセル / カバー前面 / グループ化リスト /
-     下部タブバー / 再開ドック / 没入型プレイヤー。
+     下部タブバー / 再開ドック / 2表示タブのNow Playing。
      アクセントはリーフグリーン1色。単一ファイル・外部CDNなし。
      配色・アイコンはすべて自作(参照アプリの意匠は使用しない)。
      ========================================================= */
-  /* 配色は Reviewable HTML Workbench のトークンに揃える(暖色ニュートラル+構造色)。
+  /* 配色トークン(暖色ニュートラル+構造色)。
      ライト/ダークの両方を持ち、既定はOS設定に従う(手動切替も可)。 */
   :root, [data-theme="dark"] {
     --bg: #131519;              /* bg-app: 地 */
@@ -38,7 +39,7 @@
     --warn: #d6a85a;            /* reply: 進行中・注意 */
     --r-cover: 8px; --r-card: 12px; --r-field: 10px; --r-sheet: 16px;
     --ease: cubic-bezier(.32,.72,0,1);
-    /* YouTube Music参照(Material 3トークン): 入場は減速・退出は加速、退出は短く */
+    /* 画面遷移の運動規律: 入場は減速カーブで長め・退出は加速カーブで短く */
     --ease-in-emph: cubic-bezier(.05,.7,.1,1);
     --ease-out-emph: cubic-bezier(.3,0,.8,.15);
     --dur-enter: 500ms; --dur-exit: 350ms; --dur-snap: 400ms;
@@ -90,7 +91,7 @@
     font-family: system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", "Segoe UI", sans-serif;
     -webkit-font-smoothing: antialiased;
   }
-  body { min-height: 100dvh; }
+  body { min-height: 100vh; min-height: 100dvh; }
   button { font-family: inherit; cursor: pointer; background: none; border: none; color: inherit; }
   a { color: inherit; text-decoration: none; }
   :focus-visible { outline: 2px solid var(--tint); outline-offset: 2px; }
@@ -101,8 +102,11 @@
     padding: 8px 18px; border-bottom: 1px solid var(--sep-2); position: relative; z-index: 30; }
 
   /* ---- アプリ幅(iPad的な余白) ---- */
-  .app { max-width: 980px; margin: 0 auto; padding: 10px 28px 170px; }
+  .app { max-width: 980px; margin: 0 auto;
+    padding: 10px 28px calc(170px + env(safe-area-inset-bottom, 0px)); }
   body.mode-player .app { max-width: none; padding: 0; }
+  /* ?book= 直リンク時はプレイヤーが全画面を占める(空のナビ・見出しを出さない) */
+  body.mode-player .navbar, body.mode-player .large-title { display: none; }
 
   /* ---- ナビゲーションバー(小) ---- */
   .navbar { display: flex; align-items: center; justify-content: space-between;
@@ -175,6 +179,13 @@
     border-radius: var(--r-cover); overflow: hidden; background: var(--bg-elev);
     box-shadow: 0 1px 0 var(--veil-1) inset; display: block; }
   .cov img, .detail .cover img, .simg img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* 縦長(書籍型)の表紙: 正方形タイルでは切り抜かず全体を収め、
+     余白はぼかした同じ表紙で埋める(coverIntoが縦横比で自動判定して付与) */
+  /* 二重クラスで詳細度を上げる(後方の .np-cover img 等の cover 指定に勝つため) */
+  .cov-tall.cov-tall img { object-fit: contain; position: relative; z-index: 1; }
+  .cov-tall.cov-tall img.cov-bg { position: absolute; inset: 0; z-index: 0;
+    object-fit: cover; filter: blur(16px) brightness(.6) saturate(1.1);
+    transform: scale(1.3); }
   .book-card .t { font-size: 13.5px; font-weight: 600; line-height: 1.35;
     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .book-card a:hover .t, .book-card .t a:hover { color: var(--tint); }
@@ -335,7 +346,8 @@
   .detail-rail { margin-top: 26px; }
 
   /* ---- 再開ドック(タブバー上・タップで再生画面へ) ---- */
-  #dock { position: fixed; left: 0; right: 0; bottom: 62px; z-index: 20;
+  #dock { position: fixed; left: 0; right: 0; z-index: 20;
+    bottom: calc(62px + env(safe-area-inset-bottom, 0px));
     background: var(--overlay-bg); backdrop-filter: blur(18px); border-top: 1px solid var(--sep); }
   #dock .inner { max-width: 980px; margin: 0 auto; padding: 8px 28px;
     display: flex; align-items: center; gap: 12px; position: relative; }
@@ -345,26 +357,32 @@
   #dock .cov { width: 42px; height: 42px; border-radius: 6px; overflow: hidden; flex-shrink: 0;
     box-shadow: var(--sh-card); background: var(--bg-elev2); position: relative; }
   #dock .body { flex: 1; min-width: 0; }
-  #dock .t { font-size: 13.5px; font-weight: 600;
+  /* display:block が無いと span のままで ellipsis が効かず、
+     長いタイトルが再生ボタンの下へ潜り込む(実機レビュー指摘) */
+  #dock .t { display: block; font-size: 13.5px; font-weight: 600;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #dock .m { font-size: 11.5px; color: var(--ink2); margin-top: 2px; display: block; }
   #dock .play-circ { width: 38px; height: 38px; }
   #dock .play-circ svg { width: 15px; height: 15px; }
 
   /* ---- 下部タブバー ---- */
-  #tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; height: 62px;
+  /* 高さはsafe-area(iPhoneのホームインジケータ)分だけ外側に伸ばす。
+     固定62pxのままpadding-bottomを足すと、アイコン+ラベルの領域が
+     62-34=28px に潰れてレイアウトがずれる(実機レビュー指摘) */
+  #tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21;
+    height: calc(62px + env(safe-area-inset-bottom, 0px));
     background: var(--overlay-bg); backdrop-filter: blur(18px); border-top: 1px solid var(--sep);
     display: flex; justify-content: center; align-items: center; gap: 70px;
-    padding: 0 10px env(safe-area-inset-bottom); }
+    padding: 0 10px env(safe-area-inset-bottom, 0px); }
   .tab { display: flex; flex-direction: column; align-items: center; gap: 3px;
     font-size: 10.5px; font-weight: 500; color: var(--ink3); min-width: 58px; }
   .tab svg { width: 24px; height: 24px; }
   .tab.cur { color: var(--tint); }
   body.mode-player #tabbar, body.mode-player #dock { display: none; }
 
-  /* ================= プレイヤーオーバーレイ(YouTube Music参照) =================
+  /* ================= プレイヤーオーバーレイ =================
      ページ遷移せずミニ⇄全画面を行き来する。<audio>は破棄されないので再生が途切れない。
-     入場は減速カーブで長め、退出は加速カーブで短め(Material 3の規律) */
+     入場は減速カーブで長め、退出は加速カーブで短め */
   #playerOverlay {
     position: fixed; inset: 0; z-index: 30; background: var(--bg);
     display: none; flex-direction: column;
@@ -382,303 +400,397 @@
   body.player-open { overflow: hidden; }
   body.player-open #dock { display: none; }
   /* 引き下げハンドル: 掴める範囲は広く(48px)、見た目のバーは細く残す
-     — YTMがインジケータを消して発見性を落とした失敗を避ける */
+     — 視覚インジケータを残して「引き下げられる」ことを示す */
   .drag-handle { flex-shrink: 0; height: 22px; display: flex; align-items: center;
     justify-content: center; cursor: grab; touch-action: none; }
   .drag-handle::before { content: ""; width: 36px; height: 4px; border-radius: 2px;
     background: var(--sep-2); }
   .drag-handle:active { cursor: grabbing; }
-  #playerOverlay .stage { flex: 1; min-height: 0; }
-  /* オーバーレイ内の描画先。ハンドル分を差し引いて画面内に収める */
+  /* オーバーレイ内の描画先(プレイヤー本体は .np-wrap 側が持つ) */
   #playerHost { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  #playerHost .stage { min-height: 0; }
-  #playerHost .playerpane { min-height: 0; }
 
-  /* ================= プレイヤー(没入) ================= */
-  .glow { position: fixed; inset: 0; pointer-events: none;
-    background: radial-gradient(ellipse 900px 560px at 34% 26%, color-mix(in srgb, var(--tint) 12%, transparent), transparent 70%); }
-  .stage { position: relative; min-height: 100dvh; display: flex;
-    max-width: 1400px; margin: 0 auto; padding: 0 28px; gap: 36px; }
-  .playerpane { flex: 1; min-width: 0; display: flex; flex-direction: column;
-    padding: 12px 0 18px; min-height: 100dvh; }
-  .chrome { display: flex; align-items: center; height: 44px; margin-bottom: 8px; flex-shrink: 0; }
-  .chrome .cbtn { width: 38px; height: 38px; border-radius: 50%; color: var(--ink2);
-    display: inline-flex; align-items: center; justify-content: center;
+  /* ================= プレイヤー(Now Playing・再構築版) =================
+     構成: 表紙(正方形)既定の縦積み画面+下部アクション列 /
+     上部タブで表紙⇄スライド(16:9)を切替 /
+     下スクロールで章要約が縦に積み上がり、タップでその時間へ飛ぶ /
+     全画面はタップでコントロール表示・再生中は自動で隠れる */
+  .np-wrap { position: relative; flex: 1; min-height: 0; display: flex;
+    flex-direction: column; overflow: hidden; background: var(--bg); }
+  body.mode-player .np-wrap { height: 100vh; height: 100dvh; }
+
+  /* 表紙モードのぼかし背景(表紙自身をぼかして敷く)。下端は地色へ溶かす */
+  .np-bg { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+  .np-bg img { width: 100%; height: 100%; object-fit: cover;
+    filter: blur(64px) saturate(1.15); transform: scale(1.5); opacity: .5; }
+  [data-theme="light"] .np-bg img { opacity: .35; }
+  .np-bg::after { content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      color-mix(in srgb, var(--bg) 30%, transparent) 0%,
+      color-mix(in srgb, var(--bg) 55%, transparent) 45%,
+      var(--bg) 82%); }
+  .np-wrap.mode-slide .np-bg { display: none; }
+
+  .np-scroll { position: relative; z-index: 1; flex: 1; min-height: 0;
+    overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+    display: flex; flex-direction: column; }
+  .np-scroll::-webkit-scrollbar { display: none; }
+
+  /* ---- 上部バー: 閉じる / 表紙⇄スライドのセグメントタブ / 詳細 ---- */
+  .np-top { position: sticky; top: 0; z-index: 40; flex-shrink: 0; }
+  .np-wrap.scrolled .np-top { background: var(--overlay-bg);
+    backdrop-filter: blur(16px); border-bottom: 1px solid var(--sep); }
+  .np-top .row { display: flex; align-items: center; height: 52px; padding: 0 8px; }
+  .np-icobtn { width: 42px; height: 42px; border-radius: 50%; color: var(--ink);
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
     transition: background-color .12s linear; }
-  .chrome .cbtn:hover { background: var(--bg-elev); }
-  .chrome svg { width: 20px; height: 20px; }
-  .chrome .ctx { flex: 1; text-align: center; min-width: 0; padding: 0 6px; }
-  .chrome .ctx .s { font-size: 11px; letter-spacing: .08em; color: var(--ink3); display: block;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .chrome .ctx .t { font-size: 13.5px; font-weight: 600; color: var(--ink2); display: block;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .np-icobtn:hover { background: var(--veil-1); }
+  .np-icobtn svg { width: 22px; height: 22px; }
+  .np-seg { margin: 0 auto; display: flex; background: var(--veil-2);
+    border-radius: 99px; padding: 3px; }
+  .np-seg button { width: 52px; height: 34px; border-radius: 99px; color: var(--ink2);
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background-color .12s linear, color .12s linear; }
+  .np-seg button.cur { background: var(--veil-3); color: var(--ink); }
+  .np-seg svg { width: 20px; height: 20px; }
 
-  #slide { position: relative; flex: 1; min-height: 0;
-    background: var(--slide-bg); border: 1px solid var(--veil-1);
-    border-radius: var(--r-sheet); box-shadow: var(--sh-deep);
-    padding: 44px 52px; overflow: hidden;
-    display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+  /* 表紙モードでスクロールした時だけ出る小型バー(チャプター閲覧中も再生を手放さない) */
+  .np-compact { display: none; align-items: center; gap: 10px; padding: 0 14px 10px; }
+  .np-wrap.mode-cover.scrolled .np-compact { display: flex; }
+  .np-compact .cc { width: 40px; height: 40px; border-radius: 6px; overflow: hidden;
+    background: var(--bg-elev2); position: relative; flex-shrink: 0; }
+  .np-compact .cc img { width: 100%; height: 100%; object-fit: cover; }
+  .np-compact .ct { flex: 1; min-width: 0; font-size: 13.5px; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .np-compact .np-icobtn { width: 38px; height: 38px; }
+
+  /* ---- メディア面 ---- */
+  .np-media { position: relative; z-index: 30; width: 100%; flex-shrink: 0; }
+  /* 表紙モード: 正方形ボックス */
+  .np-cover { display: none; width: min(78vw, 44vh, 380px);
+    width: min(78vw, 44dvh, 380px); aspect-ratio: 1;
+    margin: 14px auto 6px; border-radius: 12px; overflow: hidden; position: relative;
+    background: var(--bg-elev); box-shadow: var(--sh-deep); }
+  .np-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .np-wrap.mode-cover .np-cover { display: block; }
+  /* スライドモード: 16:9・幅いっぱい。スクロール中も上部に貼り付く */
+  .np-stagebox { display: none; position: relative; width: 100%; aspect-ratio: 16 / 9;
+    background: #000; overflow: hidden; container-type: inline-size;
+    max-height: 52vh; max-height: 52dvh; margin: 0 auto; }
+  .np-wrap.mode-slide .np-stagebox { display: block; }
+  .np-wrap.mode-slide .np-media { position: sticky; top: 52px; background: var(--bg); }
+  @media (min-width: 761px) {
+    .np-stagebox { max-width: 92vh; max-width: 92dvh; }
+  }
+
+  /* スライド面(テキスト/画像)。文字サイズは面の幅に追従する(全画面でも同比率) */
+  #slide { position: absolute; inset: 0; background: var(--slide-bg);
+    display: flex; flex-direction: column; justify-content: center; gap: .6em;
+    padding: 4% 6%; overflow: hidden; }
   #slide.flip { animation: slidefade .14s linear; }
   @keyframes slidefade { from { opacity: .45; } to { opacity: 1; } }
-  #slide .kind { font-size: 12px; font-weight: 700; letter-spacing: .14em; color: var(--tint);
-    display: inline-flex; align-items: center; gap: 8px; }
-  #slide .kind::before { content: ""; width: 16px; height: 2px; background: var(--tint); border-radius: 1px; }
-  #slide h2 { font-size: 27px; font-weight: 800; line-height: 1.4; letter-spacing: .01em; }
-  #slide ul { list-style: none; display: flex; flex-direction: column; gap: 13px; max-width: 620px; }
-  #slide li { font-size: 16.5px; line-height: 1.65; color: var(--slide-ink);
-    padding-left: 1.2em; text-indent: -1.2em; }
+  #slide .kind { font-weight: 700; letter-spacing: .14em; color: var(--tint);
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: clamp(10px, 2.6vw, 14px); font-size: clamp(10px, 2.1cqw, 18px); }
+  #slide .kind::before { content: ""; width: 14px; height: 2px; background: var(--tint);
+    border-radius: 1px; }
+  #slide h2 { font-weight: 800; line-height: 1.4; letter-spacing: .01em;
+    font-size: clamp(15px, 5vw, 27px); font-size: clamp(15px, 4.4cqw, 42px); }
+  #slide ul { list-style: none; display: flex; flex-direction: column; gap: .55em;
+    max-width: 92%; }
+  #slide li { line-height: 1.6; color: var(--slide-ink); padding-left: 1.2em;
+    text-indent: -1.2em;
+    font-size: clamp(12px, 3.2vw, 16px); font-size: clamp(12px, 2.6cqw, 25px); }
   #slide li::before { content: "— "; color: var(--tint); }
-  #slide .note { font-size: 12.5px; color: var(--ink2);
-    border-top: 1px dashed var(--sep-2); padding-top: 12px; max-width: 620px; }
+  #slide .note { color: var(--ink2); border-top: 1px dashed var(--sep-2);
+    padding-top: .7em; max-width: 92%;
+    font-size: clamp(10px, 2.6vw, 12.5px); font-size: clamp(10px, 2cqw, 18px); }
   #slide.kind-title, #slide.kind-section { text-align: center; align-items: center; }
-  #slide.kind-title h2 { font-size: 31px; }
   #slide.kind-section h2 { color: var(--tint); }
   #slide.kind-title li, #slide.kind-section li { text-indent: 0; padding-left: 0; }
   #slide.kind-title li::before, #slide.kind-section li::before { content: ""; }
   #slide.kind-question .kind, #slide.kind-question li::before { color: var(--warn); }
   #slide.kind-question .kind::before { background: var(--warn); }
-  /* 画像スライド(v2.1): 画像だけを見せる。額縁(枠線・角丸・パディング・影)を
-     全て外し、画像そのものが面になる。テキスト面は隠す(意味層は img の alt が
-     担持し、画像ロード失敗時は has-img が外れてテキスト面が出る) */
-  #slide.has-img { padding: 0; background: var(--stage-bg); justify-content: stretch;
-    border: none; border-radius: 0; box-shadow: none; }
+  /* 画像スライド(v2.1): 画像そのものが面になる(黒レターボックス) */
+  #slide.has-img { padding: 0; background: #000; }
   #slide.has-img > :not(.slide-img) { visibility: hidden; }
   #slide .slide-img { position: absolute; inset: 0; width: 100%; height: 100%;
     object-fit: contain; }
 
-  /* ================= 没入モード(スライド最大化) ================= */
-  /* スライドを画面いっぱいに広げ、chrome・操作・一覧はオーバーレイで出す。
-     マウス静止・再生中は自動的に隠れ、動かす/タップすると戻る */
-  body.immersive { overflow: hidden; }
-  body.immersive .stage { padding: 0; max-width: none; gap: 0; }
-  body.immersive .playerpane { padding: 0; min-height: 100dvh; position: relative; }
-  /* 全画面オーバーレイ型の没入は「横長の画面」でのみ使う。
-     縦長(モバイル縦持ち)は下の @media で YouTube Music 型の縦積みにする */
-  @media (min-aspect-ratio: 1/1), (min-width: 761px) {
-    body.immersive #slide {
-      position: fixed; inset: 0; z-index: 5; border-radius: 0; border: none;
-      box-shadow: none; min-height: 0; padding: 6vh 8vw;
-      aspect-ratio: auto; width: auto; height: auto;
-    }
-    body.immersive #slide.has-img { padding: 0; }
-  }
-  /* 没入時はテキストスライドも画面サイズに合わせて拡大する */
-  body.immersive #slide h2 { font-size: clamp(27px, 4.2vw, 64px); }
-  body.immersive #slide li { font-size: clamp(16.5px, 2.1vw, 32px); }
-  body.immersive #slide .kind { font-size: clamp(12px, 1.3vw, 20px); }
-  body.immersive #slide .note { font-size: clamp(12.5px, 1.2vw, 19px); }
-  body.immersive #slide ul, body.immersive #slide .note { max-width: 62vw; }
-  body.immersive #slide.kind-title h2 { font-size: clamp(31px, 5vw, 76px); }
+  /* ---- タップで出るメディアコントロール(再生中は自動で隠れる) ---- */
+  .mctl { position: absolute; inset: 0; z-index: 3; color: #fff;
+    background: rgba(0,0,0,.42); opacity: 0; pointer-events: none;
+    /* 非表示中は visibility でタブ移動・読み上げの対象からも外す
+       (フェードアウト完了後に hidden へ切り替える) */
+    visibility: hidden;
+    transition: opacity .18s linear, visibility 0s linear .18s; }
+  .np-stagebox.ctl .mctl { opacity: 1; pointer-events: auto;
+    visibility: visible; transition: opacity .18s linear; }
+  .mctl .c-center { position: absolute; inset: 0; display: flex; align-items: center;
+    justify-content: center; gap: clamp(24px, 9vw, 64px); }
+  .mctl .c-btn { width: 46px; height: 46px; border-radius: 50%; color: #fff;
+    background: rgba(0,0,0,.3); display: inline-flex; align-items: center;
+    justify-content: center; }
+  .mctl .c-btn svg { width: 24px; height: 24px; }
+  .mctl .c-play { width: 60px; height: 60px; }
+  .mctl .c-play svg { width: 30px; height: 30px; }
+  .mctl .c-bottom { position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: 12px; padding: 14px 56px 12px 14px;
+    /* 横向き全画面でノッチ/ホームバーに操作が欠けないよう安全域を足す */
+    padding: 14px calc(56px + env(safe-area-inset-right, 0px))
+      calc(12px + env(safe-area-inset-bottom, 0px))
+      calc(14px + env(safe-area-inset-left, 0px));
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+    background: linear-gradient(transparent, rgba(0,0,0,.6)); }
+  .mctl .c-track { flex: 1; position: relative; height: 3px; border-radius: 2px;
+    background: rgba(255,255,255,.32); cursor: pointer; touch-action: none; }
+  .mctl .c-track::before { content: ""; position: absolute; left: 0; right: 0;
+    top: -10px; bottom: -10px; }
+  .mctl .c-track .fill { position: absolute; left: 0; top: 0; bottom: 0;
+    border-radius: 2px; background: var(--tint-hi); }
+  .mctl .c-track .cue { position: absolute; top: 50%; transform: translate(-50%,-50%);
+    width: 3px; height: 3px; border-radius: 50%; background: rgba(255,255,255,.8);
+    pointer-events: none; }
+  /* 大画面用の追加操作。狭い画面では出さない(下部UIが担う) */
+  .mctl .c-skip { display: none; }
+  .mctl .c-mini { display: none; color: #fff; font-size: 12px; font-weight: 700;
+    min-width: 36px; height: 28px; border-radius: 6px; padding: 0 6px;
+    align-items: center; justify-content: center; gap: 4px; flex-shrink: 0;
+    font-variant-numeric: tabular-nums; }
+  .c-mini svg { width: 18px; height: 18px; }
+  .c-mini .lb { font-size: 11px; }
+  .c-mini.on { color: var(--tint-hi); }
+  .c-mini:hover { background: rgba(255,255,255,.15); }
+  /* 全画面中は下部UIが覆われて代替が無いため、幅に関係なく±30/速度/タイマーを出す */
+  body.np-fs .mctl .c-skip, body.np-fs .mctl .c-mini { display: inline-flex; }
 
-  /* ---- 以下は横長画面(デスクトップ/モバイル横持ち)専用のオーバーレイ型 ---- */
-  @media (min-aspect-ratio: 1/1), (min-width: 761px) {
-  body.immersive .chrome {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 12; height: auto;
-    padding: 8px 16px 10px;
-    background: var(--overlay-bg);
-    border-bottom: 1px solid var(--sep);
-    margin: 0;
-  }
-  /* 没入時の再開バーはchromeの下・スライドの外に出す(本文にもchromeにも重ねない) */
-  body.immersive #resume { position: fixed; top: var(--ovl-top, 58px); right: 4vw; left: auto;
-    width: auto; max-width: 46vw; z-index: 14; margin: 0;
-    background: var(--overlay-bg); }
-  body.immersive .ovl-bottom {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 12;
-    padding: 10px 4vw calc(env(safe-area-inset-bottom) + 10px);
-    /* 不透明の下地にする。半透明グラデだとスライド本文と重なって両方読めなくなる */
-    background: var(--overlay-bg);
-    border-top: 1px solid var(--sep);
-  }
-  /* 没入時の下部UIは高さを抑える(スライドに面積を譲る)。
-     スライド一覧は既定で畳み、一覧ボタンで開く */
-  body.immersive .ovl-bottom .counter { display: none; }
-  body.immersive .ovl-bottom .strip-head { display: none; }
-  body.immersive:not(.show-strip) .ovl-bottom .strip { display: none; }
-  .list-btn { position: absolute; right: 4vw; bottom: 14px; z-index: 13;
-    display: none; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
-    color: var(--ink2); background: var(--veil-2); border-radius: 99px;
-    padding: 7px 14px; transition: color .12s linear, background-color .12s linear; }
-  .list-btn:hover { color: var(--ink); background: var(--veil-3); }
-  body.immersive .list-btn { display: inline-flex; }
-  body.immersive.show-strip .list-btn { color: var(--tint); }
-  body.immersive .ovl-bottom .transport { margin: 6px 0 8px; gap: 16px; }
-  body.immersive .ovl-bottom .tbtn { width: 44px; height: 44px; }
-  body.immersive .ovl-bottom .tbtn svg { width: 24px; height: 24px; }
-  body.immersive .ovl-bottom .tbtn.small { width: 40px; height: 40px; }
-  body.immersive .ovl-bottom .play-main { width: 58px; height: 58px; }
-  body.immersive .ovl-bottom .play-main svg { width: 24px; height: 24px; }
-  body.immersive .ovl-bottom .thumb { width: 132px; padding: 7px 10px; }
-  body.immersive .ovl-bottom .thumb .tt { min-height: 2.5em; font-size: 11.5px; }
-  body.immersive .ovl-bottom .times { margin-top: 5px; }
-  /* 操作UIを出している間は、スライド面をUIの内側(chromeの下〜操作列の上)に収める。
-     高さはJSが実測して --ovl-top / --ovl-bottom へ入れる(内容が変わっても追従する)。
-     UIを隠している間は画面いっぱいに広がる */
-  body.immersive:not(.ui-hidden) #slide {
-    top: var(--ovl-top, 58px); bottom: var(--ovl-bottom, 236px);
-  }
-  body.immersive .counter { margin: 0 0 6px; }
-  body.immersive .transport { margin: 8px 0 10px; }
-  body.immersive .strip-head { margin: 6px 2px 8px; }
-  body.immersive .strip { padding-bottom: 2px; }
-  /* 操作を隠している間(再生中にマウス静止・タップ後の無操作) */
-  body.immersive.ui-hidden .chrome,
-  body.immersive.ui-hidden .ovl-bottom { opacity: 0; pointer-events: none; }
-  body.immersive .chrome, body.immersive .ovl-bottom { transition: opacity .25s linear; }
-  }  /* end: 横長画面専用 */
-  body.immersive.ui-hidden { cursor: none; }
-  /* 没入トグルボタン */
-  .zoom-btn { width: 38px; height: 38px; border-radius: 50%; color: var(--ink2);
+  /* 速度・タイマーの選択ポップアップ(ボタン近くに出す。全端末共通) */
+  .np-pop { position: fixed; z-index: 120; min-width: 132px; padding: 6px;
+    background: var(--overlay-bg); backdrop-filter: blur(16px);
+    border: 1px solid var(--sep-2); border-radius: 12px; box-shadow: var(--sh-float);
+    display: flex; flex-direction: column; }
+  .np-pop-item { text-align: left; font-size: 14px; font-weight: 600; color: var(--ink);
+    padding: 10px 14px 10px 32px; border-radius: 8px; position: relative;
+    font-variant-numeric: tabular-nums; }
+  .np-pop-item:hover { background: var(--veil-1); }
+  .np-pop-item.cur { color: var(--tint); background: var(--tint-soft); }
+  .np-pop-item.cur::before { content: "✓"; position: absolute; left: 12px; }
+  /* 全画面ボタン(スライド右下)。常時表示にせず、タップで出るコントロールと
+     一緒に表示/自動非表示する */
+  .np-fsbtn { position: absolute; right: 8px; bottom: 8px; z-index: 4;
+    right: calc(8px + env(safe-area-inset-right, 0px));
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    width: 40px; height: 40px; color: #fff;
+    display: inline-flex; align-items: center; justify-content: center;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity .18s linear, visibility 0s linear .18s; }
+  .np-stagebox.ctl .np-fsbtn { opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity .18s linear; }
+  /* 非全画面・未スクロール: 直下に本体トランスポートがあり操作が二重になるため、
+     スライド面のコントロールは⛶のみ(スクリムも敷かない) */
+  body:not(.np-fs) .np-wrap:not(.scrolled) .mctl { background: transparent; }
+  body:not(.np-fs) .np-wrap:not(.scrolled) .mctl .c-center,
+  body:not(.np-fs) .np-wrap:not(.scrolled) .mctl .c-bottom { display: none; }
+  /* チャプターへスクロール中(メディア固定・本体トランスポートは画面外):
+     フル操作を出し、シークバーと⛶は面の下端へ寄せる */
+  body:not(.np-fs) .np-wrap.scrolled .mctl .c-bottom {
+    padding: 10px 48px 4px 10px; }
+  /* ⛶はタップ時もスクロール時も同じ位置(下端寄せ)に固定する
+     — 状態で位置が跳ばないように(実機レビュー指摘) */
+  body:not(.np-fs) .np-fsbtn { right: 4px; bottom: 2px; }
+  /* 下地の箱は敷かない(タップ時はスクリムが出るため不要・実機レビュー指摘)。
+     明るいスライド上での視認用にグリフへ薄い落ち影だけ残す */
+  .np-fsbtn svg { width: 20px; height: 20px;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,.7)); }
+  /* 全画面時の上部バー(タイトル+終了)。コントロール表示中のみ */
+  /* タイトルは上端に張り付けない: 横向きでは safe-area-inset-top がほぼ0になり、
+     8pxだとノッチ・角丸に隠れて読めない(実機レビュー指摘)。余裕を持って下げる */
+  .mctl .fs-top { display: none; position: absolute; left: 0; right: 0; top: 0;
+    align-items: center; gap: 8px; padding: 26px 16px 22px;
+    padding: calc(26px + env(safe-area-inset-top, 0px))
+      calc(16px + env(safe-area-inset-right, 0px)) 22px
+      calc(16px + env(safe-area-inset-left, 0px));
+    color: #fff;
+    background: linear-gradient(rgba(0,0,0,.65), rgba(0,0,0,.3) 60%, transparent);
+    font-size: 14px; font-weight: 600; }
+  body.np-fs .mctl .fs-top { display: flex; }
+  .mctl .fs-top .t { flex: 1; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---- 全画面(手動⛶ / 端末を横向きにすると自動) ---- */
+  body.np-fs { overflow: hidden; }
+  body.np-fs .np-stagebox { position: fixed; inset: 0; z-index: 80;
+    aspect-ratio: auto; max-height: none; max-width: none; }
+  /* .np-top(z:40)が .np-media(z:30)のスタッキング文脈より上に来るため、
+     全画面中は上部バーを隠し、メディア面の文脈自体を持ち上げる */
+  body.np-fs .np-top { visibility: hidden; }
+  body.np-fs .np-media { z-index: 100; }
+  body.np-fs #tabbar, body.np-fs #dock { display: none; }
+  .np-stagebox:fullscreen { width: 100%; height: 100%; aspect-ratio: auto;
+    max-height: none; max-width: none; }
+
+  /* ---- 最初の画面(タイトル→チップ→シーク→操作→アクションの縦積み) ---- */
+  .np-head { position: relative; z-index: 1; width: 100%; max-width: 560px;
+    margin: 0 auto; padding: 16px 20px 0; flex-shrink: 0; }
+  .np-resume { display: none; align-items: center; gap: 10px; margin-bottom: 12px;
+    font-size: 12.5px; color: var(--ink2); background: var(--bg-elev);
+    border: 1px solid var(--sep); border-radius: 10px; padding: 8px 12px; }
+  .np-resume b { color: var(--tint); }
+  .np-resume button { margin-left: auto; color: var(--tint); font-size: 12.5px;
+    font-weight: 600; flex-shrink: 0; }
+  .np-title h1 { font-size: 21px; font-weight: 800; line-height: 1.35; }
+  .np-title .sub { margin-top: 4px; font-size: 13.5px; color: var(--ink2); }
+  .np-chips { display: flex; gap: 9px; margin-top: 14px; overflow-x: auto;
+    scrollbar-width: none; }
+  .np-chips::-webkit-scrollbar { display: none; }
+  .np-chip { flex-shrink: 0; display: inline-flex; align-items: center;
+    font-size: 13px; font-weight: 600; color: var(--ink);
+    border: 1px solid var(--sep-2); border-radius: 99px; padding: 8px 16px;
+    transition: background-color .12s linear; }
+  .np-chip:hover { background: var(--veil-1); }
+
+  /* シークバー(cue位置の目盛付き)+ 残り時間(再生速度で換算) */
+  .np-seek { margin-top: 16px; padding: 6px 0; touch-action: none; }
+  .np-track { position: relative; height: 4px; border-radius: 2px;
+    background: var(--veil-3); cursor: pointer; }
+  /* 見た目は細いまま、タップ判定だけ上下に広げる(疑似要素はイベントを
+     track 本体へ届けるので bindScrub の判定がそのまま効く) */
+  .np-track::before { content: ""; position: absolute; left: 0; right: 0;
+    top: -10px; bottom: -10px; }
+  .np-track .fill { position: absolute; left: 0; top: 0; bottom: 0;
+    border-radius: 2px; background: var(--tint); }
+  .np-track .knob { position: absolute; top: 50%; left: 0;
+    transform: translate(-50%,-50%); width: 15px; height: 15px; border-radius: 50%;
+    background: var(--tint); box-shadow: var(--sh-card); pointer-events: none; }
+  .np-track .cue { position: absolute; top: 50%; transform: translate(-50%,-50%);
+    width: 3px; height: 3px; border-radius: 50%; background: var(--ink3);
+    pointer-events: none; }
+  .np-times { display: flex; align-items: baseline; margin-top: 8px;
+    font-size: 12px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+  .np-times .mid { flex: 1; text-align: center; color: var(--ink3); }
+
+  /* トランスポート(前章 / −30秒 / 再生 / +30秒 / 次章) */
+  .np-transport { display: flex; align-items: center; justify-content: center;
+    gap: clamp(4px, 2.6vw, 18px); margin: 12px 0 4px; }
+  /* 幅320px級でも正円のまま収まるよう、固定pxでなく clamp で追従縮小させる
+     (flex-shrink による横方向だけの潰れ=楕円化を防ぐ) */
+  .np-tbtn { width: clamp(44px, 14vw, 54px); height: clamp(44px, 14vw, 54px);
+    border-radius: 50%; color: var(--ink); flex-shrink: 0;
     display: inline-flex; align-items: center; justify-content: center;
     transition: background-color .12s linear; }
-  .zoom-btn:hover { background: var(--bg-elev); }
-  .zoom-btn svg { width: 19px; height: 19px; }
-
-  /* 通常モードでもスライドを大きく見せる(黒帯を減らす) */
-  #slide { aspect-ratio: 16 / 9; flex: 0 0 auto; }
-
-  /* ---- 縦画面(モバイル)の没入モード ----
-     16:9のスライドは縦画面だと幅いっぱいでも高さが余る。スライドは上端寄り
-     (chromeの下)に置き、余った下側を操作UIとスライド一覧に使う。
-     さらに拡大したいときは端末を横向きにすると全画面になる */
-  @media (orientation: portrait) and (max-width: 760px) {
-    /* ---- 縦画面は YouTube Music の Now Playing 構造(縦積み)にする ----
-       上から: ヘッダ → スライド(16:9・幅いっぱい) → タイトル → 本文(要点) →
-       シークバー → 大きな操作列 → 目次。fixed配置をやめて自然に積む */
-    /* オーバーレイ内はハンドル(22px)分を差し引く。直リンク時は画面高いっぱい。
-       .stage は既定で横並び(flex-direction: row)のため、縦画面では縦並びに戻す
-       — さもないとスライドが横に引き伸ばされ、16:9で高さが画面外まで膨張する */
-    body.immersive .stage { flex-direction: column; width: 100%; }
-    body.immersive .playerpane { display: flex; flex-direction: column;
-      height: 100dvh; width: 100%; }
-    body.player-open.immersive .playerpane { height: calc(100dvh - 22px); }
-    body.immersive .chrome { position: static; background: none; border: none;
-      padding: 6px 12px; flex-shrink: 0; }
-    body.immersive #slide,
-    body.immersive:not(.ui-hidden) #slide {
-      position: relative; inset: auto; top: auto; bottom: auto;
-      width: 100%; height: auto; aspect-ratio: 16 / 9; flex-shrink: 0;
-      border-radius: 0; margin: 0; padding: 0; overflow: hidden;
-      border: none; box-shadow: none;
-    }
-    /* 再開バーは絶対配置をやめ、chromeの直下に積む */
-    body.immersive #resume { position: static; margin: 0 12px 8px;
-      max-width: none; left: auto; right: auto; top: auto; }
-    /* スライドの下に本文(見出し・要点)を出す。空白を情報で埋める */
-    .np-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 4px; }
-    .np-body .np-title { font-size: 19px; font-weight: 700; line-height: 1.4;
-      color: var(--ink); }
-    .np-body .np-sub { font-size: 12.5px; color: var(--ink3); margin-top: 4px; }
-    .np-body ul { list-style: none; margin-top: 12px; display: flex;
-      flex-direction: column; gap: 9px; }
-    .np-body li { font-size: 14.5px; line-height: 1.6; color: var(--ink2);
-      padding-left: 1.1em; text-indent: -1.1em; }
-    .np-body li::before { content: "— "; color: var(--tint); }
-    body:not(.immersive) .np-body { display: none; }
-    /* 操作列は下部に固定。YTM同様に大きく */
-    body.immersive .ovl-bottom { position: static; padding: 0 16px
-      calc(env(safe-area-inset-bottom) + 10px); background: none; border: none;
-      flex-shrink: 0; }
-    body.immersive .ovl-bottom .transport { gap: 20px; margin: 4px 0 6px; }
-    body.immersive .ovl-bottom .play-main { width: 66px; height: 66px; }
-    body.immersive .ovl-bottom .play-main svg { width: 28px; height: 28px; }
-    body.immersive .ovl-bottom .tbtn { width: 48px; height: 48px; }
-    body.immersive #resume { position: static; margin: 0 12px 6px; }
-    /* 縦画面では自動で隠さない(積み構造なので隠しても得がない) */
-    body.immersive.ui-hidden .chrome,
-    body.immersive.ui-hidden .ovl-bottom,
-    body.immersive.ui-hidden .np-body { opacity: 1; pointer-events: auto; }
-    body.immersive .ovl-bottom { background: var(--overlay-bg); }
-    /* 縦画面では操作UIを自動で隠さない(隠しても余白が空くだけで得がない) */
-    body.immersive.ui-hidden .chrome,
-    body.immersive.ui-hidden .ovl-bottom { opacity: 1; pointer-events: auto; }
-    body.immersive.ui-hidden { cursor: auto; }
-  }
-  /* 横向きヒント(縦画面の没入時のみ・数秒で消える) */
-  .rot-hint { position: fixed; left: 50%; bottom: 38vh; transform: translateX(-50%);
-    z-index: 13; background: var(--overlay-bg); color: var(--ink2);
-    border: 1px solid var(--sep); border-radius: 99px; padding: 9px 18px;
-    font-size: 12.5px; white-space: nowrap; pointer-events: none;
-    transition: opacity .4s linear; }
-
-  .counter { text-align: center; font-size: 12.5px; color: var(--ink3);
-    margin: 14px 0 10px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-  .counter b { color: var(--ink2); font-weight: 600; }
-
-  /* ---- スクラバー ---- */
-  .scrubber { padding: 6px 2px; flex-shrink: 0; touch-action: none; }
-  .scrub-track { position: relative; height: 7px; border-radius: 4px;
-    background: var(--veil-3); cursor: pointer; }
-  .scrub-track .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0;
-    border-radius: 4px; background: var(--tint); }
-  .scrub-track .knob { position: absolute; left: 0; top: 50%; transform: translate(-50%,-50%);
-    width: 18px; height: 18px; border-radius: 50%; background: var(--knob);
-    box-shadow: var(--sh-card); pointer-events: none; }
-  .scrub-track .cue { position: absolute; top: 50%; transform: translate(-50%,-50%);
-    width: 4px; height: 4px; border-radius: 50%; background: var(--ink3);
-    pointer-events: none; }
-  .times { display: flex; justify-content: space-between; margin-top: 8px;
-    font-size: 12px; color: var(--ink3); font-variant-numeric: tabular-nums; }
-
-  /* ---- トランスポート ---- */
-  .transport { display: flex; align-items: center; justify-content: center; gap: 22px;
-    margin: 14px 0 8px; flex-shrink: 0; }
-  .tbtn { color: var(--ink); display: inline-flex; align-items: center; justify-content: center;
-    width: 52px; height: 52px; border-radius: 50%;
-    transition: background-color .12s linear; }
-  .tbtn:hover { background: var(--veil-1); }
-  .tbtn svg { width: 28px; height: 28px; }
-  .tbtn.small { color: var(--ink2); width: 46px; height: 46px; }
-  .tbtn.small svg { width: 24px; height: 24px; }
-  .play-main { width: 74px; height: 74px; border-radius: 50%; background: var(--tint);
-    color: var(--on-tint); display: inline-flex; align-items: center; justify-content: center;
-    box-shadow: 0 10px 30px color-mix(in srgb, var(--tint) 30%, transparent); transition: background-color .12s linear; }
-  .play-main:hover { background: var(--tint-hi); }
-  .play-main svg { width: 30px; height: 30px; }
-  .speed { font-size: 13px; font-weight: 700; color: var(--ink2);
-    border: 1px solid var(--veil-3); border-radius: 99px;
-    padding: 7px 14px; min-width: 62px; text-align: center;
-    font-variant-numeric: tabular-nums;
-    transition: color .12s linear, border-color .12s linear; }
-  .speed:hover { color: var(--ink); border-color: var(--sep-2); }
+  .np-tbtn:hover { background: var(--veil-1); }
+  .np-tbtn svg { width: 28px; height: 28px; }
+  .np-play { width: clamp(58px, 19vw, 74px); height: clamp(58px, 19vw, 74px);
+    border-radius: 50%; flex-shrink: 0;
+    background: var(--ink); color: var(--bg);
+    display: inline-flex; align-items: center; justify-content: center;
+    box-shadow: var(--sh-float); transition: transform .12s var(--ease); }
+  .np-play:active { transform: scale(.96); }
+  .np-play svg { width: 30px; height: 30px; }
   .skipnum { position: relative; }
   .skipnum .n { position: absolute; inset: 0; display: flex; align-items: center;
     justify-content: center; font-size: 9.5px; font-weight: 700; padding-top: 2px; }
 
-  /* ---- フィルムストリップ ---- */
-  .strip-head { display: flex; align-items: baseline; justify-content: space-between;
-    margin: 12px 2px 10px; flex-shrink: 0; }
-  .strip-head .h { font-size: 13px; font-weight: 700; color: var(--ink2); letter-spacing: .04em; }
-  .strip-head .sub { font-size: 11.5px; color: var(--ink3); }
-  .strip { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px;
-    scrollbar-width: none; flex-shrink: 0; }
-  .strip::-webkit-scrollbar { display: none; }
-  .thumb { flex-shrink: 0; width: 148px; border-radius: 10px;
-    background: var(--bg-elev); border: 1.5px solid transparent;
-    padding: 10px 12px; text-align: left;
-    display: flex; flex-direction: column; gap: 5px;
-    transition: background-color .12s linear; }
-  .thumb:hover { background: var(--bg-elev2); }
-  .thumb .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .thumb .no { font-size: 11px; font-weight: 700; color: var(--ink3); }
-  .thumb .tm { font-size: 10.5px; color: var(--ink3); font-variant-numeric: tabular-nums; }
-  .thumb .tt { font-size: 12px; font-weight: 600; line-height: 1.35; color: var(--ink2);
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-    min-height: 2.7em; }
-  .thumb.cur { border-color: var(--tint); background: var(--tint-soft); }
-  .thumb.cur .no, .thumb.cur .tm { color: var(--tint); }
-  .thumb.cur .tt { color: var(--ink); }
-  .thumb.played .tt { color: var(--ink3); }
+  /* 下部アクション列(速度 / タイマー / タイトル詳細) */
+  .np-actions { display: flex; align-items: flex-start; justify-content: space-around;
+    margin: 14px 0 0; }
+  .np-act { display: flex; flex-direction: column; align-items: center; gap: 5px;
+    min-width: 76px; padding: 8px 6px; font-size: 12px; color: var(--ink);
+    border-radius: 12px; transition: background-color .12s linear; }
+  .np-act:hover { background: var(--veil-1); }
+  .np-act .ic { height: 26px; display: flex; align-items: center; }
+  .np-act .ic svg { width: 24px; height: 24px; }
+  .np-act .big { font-size: 17px; font-weight: 800; height: 26px; display: flex;
+    align-items: center; font-variant-numeric: tabular-nums; }
+  .np-act .lb { font-size: 11.5px; color: var(--ink2); }
+  .np-act.on, .np-act.on .lb { color: var(--tint); }
 
-  #resume { display: none; align-items: center; gap: 10px; font-size: 12.5px; color: var(--ink2);
-    background: var(--tint-soft); border: 1px solid rgba(92,174,125,.3);
-    border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; flex-shrink: 0; }
-  #resume b { color: var(--tint); }
-  #resume button { margin-left: auto; color: var(--ink3); font-size: 14px; }
+  /* チャプターへの誘い(下部シート風の取っ手) */
+  .np-hint { display: flex; flex-direction: column; align-items: center; gap: 9px;
+    width: 100%; padding: 16px 0 14px; color: var(--ink2); font-size: 12.5px; }
+  .np-hint::before { content: ""; width: 40px; height: 4px; border-radius: 2px;
+    background: var(--sep-2); }
+
+  /* ---- チャプター(番号+時刻+見出し+要点の縦積み) ---- */
+  .np-chapters { position: relative; z-index: 1; background: var(--bg);
+    border-top: 1px solid var(--sep); flex-shrink: 0;
+    min-height: 62vh; min-height: 62dvh;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 28px); }
+  .np-ch-head { max-width: 560px; margin: 0 auto; padding: 0 20px;
+    display: flex; align-items: baseline; }
+  .np-ch-tab { padding: 13px 2px 10px; font-size: 15px; font-weight: 700;
+    border-bottom: 2.5px solid var(--tint); }
+  .np-ch-count { margin-left: auto; font-size: 12.5px; color: var(--ink3); }
+  .np-chlist { max-width: 560px; margin: 0 auto; display: flex;
+    flex-direction: column; }
+  .np-chap { display: flex; gap: 14px; width: 100%; text-align: left;
+    padding: 16px 20px; transition: background-color .12s linear; }
+  .np-chap + .np-chap { border-top: 1px solid var(--sep); }
+  .np-chap:hover { background: var(--veil-1); }
+  .np-chap .no { flex-shrink: 0; width: 58px; }
+  .np-chap .no b { display: block; font-size: 28px; font-weight: 800;
+    line-height: 1.1; color: var(--ink3); font-variant-numeric: tabular-nums; }
+  .np-chap .no .tm { display: block; margin-top: 5px; font-size: 11.5px;
+    color: var(--ink3); font-variant-numeric: tabular-nums; }
+  .np-chap .bd { flex: 1; min-width: 0; }
+  .np-chap .tt { display: block; font-size: 15px; font-weight: 700;
+    line-height: 1.45; }
+  .np-chap ul { list-style: none; margin-top: 7px; display: flex;
+    flex-direction: column; gap: 4px; }
+  .np-chap li { font-size: 13px; line-height: 1.6; color: var(--ink2);
+    padding-left: 1.1em; text-indent: -1.1em; }
+  .np-chap li::before { content: "- "; color: var(--ink3); }
+  .np-chap .alt { margin-top: 7px; font-size: 13px; line-height: 1.6;
+    color: var(--ink2); }
+  .np-chap .nt { margin-top: 7px; font-size: 11.5px; color: var(--ink3); }
+  .np-chap.cur { background: var(--tint-soft); }
+  .np-chap.cur .no b, .np-chap.cur .no .tm { color: var(--tint); }
+
+  /* ---- デスクトップ/ウェブ版: 2カラム ----
+     左=メディア+タイトル+操作 / 右=チャプター(独立スクロール)。
+     全画面時・狭い画面は従来どおり */
+  @media (min-width: 1000px) {
+    body:not(.np-fs) .np-scroll { display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+      grid-template-rows: auto auto minmax(0, 1fr);
+      gap: 0 28px; padding: 0 32px; overflow: hidden; }
+    body:not(.np-fs) .np-top { grid-column: 1 / -1; grid-row: 1; }
+    body:not(.np-fs) .np-media,
+    body:not(.np-fs) .np-wrap.mode-slide .np-media {
+      grid-column: 1; grid-row: 2; position: static; background: none; }
+    body:not(.np-fs) .np-head { grid-column: 1; grid-row: 3; overflow-y: auto;
+      min-height: 0; max-width: none; margin: 0; padding: 16px 4px 24px;
+      scrollbar-width: none; }
+    body:not(.np-fs) .np-head::-webkit-scrollbar { display: none; }
+    body:not(.np-fs) .np-chapters { grid-column: 2; grid-row: 2 / span 2;
+      overflow-y: auto; min-height: 0; border-top: none;
+      border-left: 1px solid var(--sep); padding-bottom: 24px;
+      scrollbar-width: thin; }
+    body:not(.np-fs) .np-ch-head { position: sticky; top: 0;
+      background: var(--bg); z-index: 2; }
+    /* 右にチャプターが常時見えるため、誘導用の取っ手とチップは不要 */
+    body:not(.np-fs) .np-hint, body:not(.np-fs) #chipChapters { display: none; }
+    body:not(.np-fs) .np-cover { margin: 24px auto 8px; }
+
+    /* ---- スライドタブでは操作を全てメディア内オーバーレイへ(ホバー表示)。
+       下はタイトルだけにして、スライドをほぼ画面いっぱいにする。
+       表紙タブはオーバーレイを持たないため従来の下部操作を残す ---- */
+    body:not(.np-fs) .np-wrap.mode-slide .np-seek,
+    body:not(.np-fs) .np-wrap.mode-slide .np-transport,
+    body:not(.np-fs) .np-wrap.mode-slide .np-actions { display: none; }
+    body:not(.np-fs) .np-stagebox { max-width: none;
+      max-height: calc(100vh - 200px); max-height: calc(100dvh - 200px); }
+    /* 未スクロールでもフル操作を出す(下部の重複UIが無いため)。
+       スライドを読んでいる最中に暗くしないようスクリムは敷かない */
+    body:not(.np-fs) .np-wrap:not(.scrolled) .mctl .c-center { display: flex; }
+    body:not(.np-fs) .np-wrap:not(.scrolled) .mctl .c-bottom { display: flex; }
+    body:not(.np-fs) .mctl { background: transparent; }
+    .mctl .c-skip { display: inline-flex; }
+    .mctl .c-mini { display: inline-flex; }
+  }
 
   /* ---- モバイル ---- */
   @media (max-width: 700px) {
-    .app { padding: 8px 16px 170px; }
+    .app { padding: 8px 16px calc(170px + env(safe-area-inset-bottom, 0px)); }
     .large-title { font-size: 32px; }
     .resume-card { width: 322px; }
     .book-card { width: 152px; }
@@ -687,17 +799,16 @@
     .browse-grid { grid-template-columns: 1fr; }
     #tabbar { gap: 0; justify-content: space-around; }
     #dock .inner { padding: 8px 14px; }
-    .stage { padding: 0 14px; }
-    #slide { padding: 26px 22px; }
-    #slide h2 { font-size: 22px; }
-    .transport { gap: 10px; }
   }
 
   /* ---- ログインオーバーレイ ---- */
   #login { position: fixed; inset: 0; z-index: 40; background: var(--bg);
     display: flex; align-items: center; justify-content: center; padding: 24px; }
   #login .panel { width: 340px; max-width: 100%; text-align: center; }
-  #login .mark { width: 56px; height: 56px; margin: 0 auto 14px; color: var(--tint); }
+  /* ロゴは2色。ヘッドフォンが --ink、スクリーンが --glyph-tint。
+     --glyph-tint を指定しない場所(カバーのプレースホルダ)では単色に落ちる */
+  #login .mark { width: 56px; height: 56px; margin: 0 auto 14px;
+    color: var(--ink); --glyph-tint: var(--tint); }
   #login .mark svg { width: 100%; height: 100%; }
   #login h1 { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
   #login p { font-size: 13px; color: var(--ink2); margin-bottom: 20px; }
@@ -847,7 +958,7 @@
   }
 
   // ================= テーマ(ライト/ダーク) =================
-  // Workbenchと同じトークン体系。既定はOS設定に従い、手動切替を記憶する
+  // 既定はOS設定に従い、手動切替を記憶する
   function currentTheme() {
     var saved = lsGet("kikimiru.theme");
     if (saved === "light" || saved === "dark") return saved;
@@ -1020,12 +1131,21 @@
     nextSlide: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.5 5.9v12.2c0 .9 1 1.4 1.7 1l9.2-6.1c.7-.4.7-1.5 0-1.9L6.2 5c-.7-.5-1.7 0-1.7.9z"/><rect x="16.9" y="5.2" width="2.6" height="13.6" rx="1"/></svg>',
     back10: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5a9.5 9.5 0 1 1-8.4 5"/><path d="m9.2 3.8-2.6 6.7 6.7-1.3"/></svg>',
     fwd10: '<svg viewBox="0 0 30 30" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5.5a9.5 9.5 0 1 0 8.4 5"/><path d="m20.8 3.8 2.6 6.7-6.7-1.3"/></svg>',
-    glyph: '<svg viewBox="0 0 44 44" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6" y="10" width="22" height="17" rx="2.5"/><path d="M11 16h12M11 21h8"/><path d="M33 15v14M38 19v6"/></svg>',
+    // ロゴマーク。意匠の正典は web/logo.svg で、tools/make_icons.py も同じ形を写している。
+    // ここを変えたら3か所とも直すこと。単色(currentColor)なのは、ログイン画面では
+    // --tint、カバーのプレースホルダでは --ink3 と、置き場所ごとに色を変えて使うため
+    glyph: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.32 29.5V21.67a13.58 13.58 0 0 1 27.16 0V29.5" stroke-width="1.35"/><rect x="7.8" y="24.9" width="4.75" height="9.2" rx="2" stroke-width="1.05"/><rect x="35.25" y="24.9" width="4.75" height="9.2" rx="2" stroke-width="1.05"/><g stroke="var(--glyph-tint,currentColor)"><path d="M13.55 17.72h20.72" stroke-width="1.5"/><path d="M14.49 18.2v14.3a1.8 1.8 0 0 0 1.8 1.8h15.21a1.8 1.8 0 0 0 1.8-1.8V18.2" stroke-width=".98"/><path d="M23.9 34.3v2.54" stroke-width=".94"/><circle cx="23.9" cy="37.99" r="1.15" stroke-width=".84"/></g><path d="M17.76 22.64h12.34" stroke-width="1.12"/><path d="M17.61 27.35v1.92M18.68 26.27v4.08M19.62 27.63v1.36M20.63 26.79v3.04M21.68 25.59v5.44M22.76 26.64v3.34M23.84 27.44v1.74M24.87 27.25v2.12M25.97 26.46v3.7M27.03 25.75v5.12M28.11 27.09v2.44M29.14 26.62v3.38M30.24 27.31v2" stroke-width=".66"/></svg>',
+    // 44px以下では面の中身(行と波形)が潰れるため、カバーのプレースホルダには
+    // 中身を省き線を太らせた簡略版を使う(web/icon-32.png と同じ考え方・倍率も同じ1.9)
+    glyphSmall: '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10.32 29.5V21.67a13.58 13.58 0 0 1 27.16 0V29.5" stroke-width="2.57"/><rect x="7.8" y="24.9" width="4.75" height="9.2" rx="2" stroke-width="2"/><rect x="35.25" y="24.9" width="4.75" height="9.2" rx="2" stroke-width="2"/><g stroke="var(--glyph-tint,currentColor)"><path d="M13.55 17.72h20.72" stroke-width="2.85"/><path d="M14.49 18.2v14.3a1.8 1.8 0 0 0 1.8 1.8h15.21a1.8 1.8 0 0 0 1.8-1.8V18.2" stroke-width="1.86"/><path d="M23.9 34.3v2.54" stroke-width="1.79"/><circle cx="23.9" cy="37.99" r="1.15" stroke-width="1.6"/></g></svg>',
     logout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13.5 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20h7"/><path d="M16 8.5 19.5 12 16 15.5"/><path d="M10 12h9.5"/></svg>',
     sun: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7"/></svg>',
     moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8.2 8.2 0 0 1 10.5 4a8.2 8.2 0 1 0 9.5 9.5z"/></svg>',
     expand: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4H4v5"/><path d="M15 20h5v-5"/><path d="M20 9V4h-5"/><path d="M4 15v5h5"/></svg>',
-    collapse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h5V4"/><path d="M20 15h-5v5"/><path d="M15 4v5h5"/><path d="M9 20v-5H4"/></svg>'
+    collapse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h5V4"/><path d="M20 15h-5v5"/><path d="M15 4v5h5"/><path d="M9 20v-5H4"/></svg>',
+    headph: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 14a7.8 7.8 0 0 1 15.6 0"/><rect x="3.4" y="13.4" width="4" height="6.4" rx="1.8"/><rect x="16.6" y="13.4" width="4" height="6.4" rx="1.8"/></svg>',
+    slideTab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.4"/><path d="m10.4 9.5 4.6 2.5-4.6 2.5z" fill="currentColor" stroke="none"/></svg>',
+    timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.6" r="6.8"/><path d="M12 10.6v3.4l2.3 1.5"/><path d="M9.6 3.4h4.8"/><path d="M12 3.4v2.2"/></svg>'
   };
 
   // ================= 状態 =================
@@ -1108,8 +1228,10 @@
   }
 
   // 再開ドック: 最後に聴いていた進行中のブックをどの画面からも1タップで再開できる。
-  // (アプリはページ遷移型のため連続再生ではなく「再開」のドック。連続再生化はPhase 1後半)
+  // オーバーレイのaudioが生きている間はそれに直結し、進捗・再生状態をライブ同期する。
+  var dockCleanup = null;
   function renderDock(books) {
+    if (dockCleanup) { try { dockCleanup(); } catch (e) {} dockCleanup = null; }
     var dock = document.getElementById("dock");
     var best = null;
     books.forEach(function (b) {
@@ -1118,6 +1240,17 @@
       if (st.st !== "listening") return;
       if (!best || (pos.at || 0) > (best.pos.at || 0)) best = { book: b, pos: pos, st: st };
     });
+    // 読み込み済みのブックを最優先(閉じても audio は生きている)
+    var liveAudio = null;
+    if (overlayBookId) {
+      var la = document.querySelector("#playerHost audio");
+      var loaded = books.filter(function (b) { return b.id === overlayBookId; })[0];
+      if (la && loaded) {
+        liveAudio = la;
+        var lpos = loadPos(loaded.library, loaded.id) || { t: la.currentTime, d: la.duration || 0 };
+        best = { book: loaded, pos: lpos, st: posState(lpos) };
+      }
+    }
     if (!best) { dock.hidden = true; return; }
     dock.hidden = false;
     dock.textContent = "";
@@ -1134,12 +1267,17 @@
     a.appendChild(cov);
     var body = el("span", "body");
     body.appendChild(el("span", "t", best.book.title));
-    var meta = "残り " + fmt(Math.max(0, best.pos.d - best.pos.t));
-    if (best.pos.s && best.pos.n) meta += " · スライド " + best.pos.s + "/" + best.pos.n;
-    body.appendChild(el("span", "m", meta));
+    var mEl = el("span", "m");
+    function metaText(t, d) {
+      var s = "残り " + fmt(Math.max(0, d - t));
+      var pos2 = loadPos(best.book.library, best.book.id);
+      if (pos2 && pos2.s && pos2.n) s += " · スライド " + pos2.s + "/" + pos2.n;
+      return s;
+    }
+    mEl.textContent = metaText(best.pos.t, best.pos.d);
+    body.appendChild(mEl);
     a.appendChild(body);
     var pc = el("span", "play-circ");
-    pc.setAttribute("aria-hidden", "true");
     pc.innerHTML = I.play;
     a.appendChild(pc);
     a.setAttribute("aria-label", best.book.title + " を続きから再生");
@@ -1148,6 +1286,58 @@
       ev.preventDefault();
       openPlayerOverlay(best.book.id);
     });
+    if (liveAudio) {
+      // ライブ同期: 進捗バー・残り時間・再生状態を audio に追従させ、
+      // 再生ボタンはその場で再生/一時停止を切り替える(オーバーレイは開かない)
+      var laRef = liveAudio;
+      function dockPaint() {
+        var d = laRef.duration || best.pos.d || 0;
+        var t = laRef.currentTime;
+        if (d > 0) fill.style.width = Math.min(100, t / d * 100) + "%";
+        mEl.textContent = metaText(t, d);
+        pc.innerHTML = laRef.paused ? I.play : I.pauseBig;
+        pc.setAttribute("aria-label", laRef.paused ? "再生" : "一時停止");
+      }
+      pc.setAttribute("role", "button");
+      pc.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        if (laRef.paused) laRef.play().catch(function () {});
+        else laRef.pause();
+      });
+      laRef.addEventListener("timeupdate", dockPaint);
+      laRef.addEventListener("play", dockPaint);
+      laRef.addEventListener("pause", dockPaint);
+      dockCleanup = function () {
+        laRef.removeEventListener("timeupdate", dockPaint);
+        laRef.removeEventListener("play", dockPaint);
+        laRef.removeEventListener("pause", dockPaint);
+      };
+      dockPaint();
+    } else {
+      // まだプレイヤーが読み込まれていない(起動直後の初回タップ)。
+      // ▶はオーバーレイを開かず、裏でプレイヤーを用意してその場で再生を開始する
+      pc.setAttribute("role", "button");
+      pc.setAttribute("aria-label", "再生");
+      pc.addEventListener("click", function (ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        var host = document.getElementById("playerHost");
+        if (overlayBookId !== best.book.id || host.childElementCount === 0) {
+          host.textContent = "";
+          overlayBookId = best.book.id;
+          viewPlayer(best.book.id, host);
+        }
+        var la2 = document.querySelector("#playerHost audio");
+        if (la2) {
+          var tryPlay = function () { la2.play().catch(function () {}); };
+          tryPlay();  // srcが未設定なら失敗するが、canplayで再試行する
+          la2.addEventListener("canplay", tryPlay, { once: true });
+        }
+        // ライブ同期版のドックに描き直す
+        api("/api/books").then(function (d2) { renderDock(d2.books); }).catch(function () {});
+      });
+    }
     dock.appendChild(a);
   }
 
@@ -1155,7 +1345,7 @@
   function coverInto(container, lib, bookId, coverName, title, tiny) {
     // プレースホルダ: 自作グリフ+タイトル(グラデーション・色相ハッシュは廃止)
     var ph = el("div", "ph-fill");
-    ph.innerHTML = I.glyph;
+    ph.innerHTML = I.glyphSmall;
     if (!tiny) ph.appendChild(el("span", "pht", title || bookId));
     container.appendChild(ph);
     if (coverName) {
@@ -1171,6 +1361,15 @@
         ph.remove();
         img.style.opacity = "";
         img.style.position = "";
+        // 縦長(書籍型)の表紙は切り抜かず全体を見せ、背景をぼかし表紙で埋める
+        if (img.naturalHeight > img.naturalWidth * 1.04) {
+          container.classList.add("cov-tall");
+          var bg = document.createElement("img");
+          bg.className = "cov-bg";
+          bg.alt = "";
+          bg.src = img.src;
+          container.insertBefore(bg, img);
+        }
       });
       img.addEventListener("error", function () { img.remove(); });
       img.src = bookBase(lib, bookId) + encodeURIComponent(coverName);
@@ -1271,8 +1470,8 @@
       coverInto(front, state.lib, g.sample.book, g.sample.cover, g.name, true);
       coverInto(back, state.lib, g.sample.book, g.sample.cover, g.name, true);
     } else {
-      front.innerHTML = '<span class="ph-fill">' + I.glyph + "</span>";
-      back.innerHTML = '<span class="ph-fill">' + I.glyph + "</span>";
+      front.innerHTML = '<span class="ph-fill">' + I.glyphSmall + "</span>";
+      back.innerHTML = '<span class="ph-fill">' + I.glyphSmall + "</span>";
     }
     stack.appendChild(back);
     stack.appendChild(front);
@@ -1440,7 +1639,7 @@
         var g2 = el("div", "group");
         g2.appendChild(groupRow("tag", "タグ", Object.keys(tagCount).length, qs({ view: "tags" })));
         g2.appendChild(groupRow("stats", "統計", d.books.length + "冊", qs({ view: "stats" })));
-        // テーマ切替(Workbench同様のライト/ダーク)
+        // テーマ切替(ライト/ダーク)
         var themeNow = currentTheme();
         var th = groupRow(themeNow === "light" ? "sun" : "moon", "テーマ",
                           themeNow === "light" ? "ライト" : "ダーク", "#");
@@ -1913,7 +2112,7 @@
   }
 
   // ================= プレイヤーオーバーレイ制御 =================
-  // YouTube Music参照: ミニプレイヤーからページ遷移せず展開し、引き下げで縮小する。
+  // ミニプレイヤーからページ遷移せず展開し、引き下げで縮小する。
   // <audio> はオーバーレイ内に留まり破棄されないため、開閉しても再生が途切れない。
   var overlayOpen = false;
   var overlayBookId = null;
@@ -1921,6 +2120,16 @@
   function openPlayerOverlay(bookId) {
     if (overlayOpen && overlayBookId === bookId) return;
     var host = document.getElementById("playerHost");
+    // 同じブックを開き直す場合は再描画しない(audioを作り直すと再生が途切れるため)
+    if (!overlayOpen && overlayBookId === bookId && host.childElementCount > 0) {
+      overlayOpen = true;
+      document.body.classList.remove("player-closing");
+      document.body.classList.add("player-open");
+      try {
+        history.pushState({ player: bookId }, "", qs({ book: bookId }));
+      } catch (e) { /* file:// 等では無視 */ }
+      return;
+    }
     var start = function () {
       host.textContent = "";
       overlayBookId = bookId;
@@ -1943,10 +2152,13 @@
     overlayOpen = false;
     document.body.classList.add("player-closing");
     document.body.classList.remove("player-open");
-    document.body.classList.remove("immersive", "ui-hidden", "show-strip");
+    document.body.classList.remove("np-fs");
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(function () {});
+    }
     document.getElementById("playerOverlay").style.transform = "";
     // 中身は破棄しない — <audio> を生かしたまま隠すことで再生が途切れない
-    // (YouTube Music が dismiss を廃止したのと同じ考え方。破棄は別ブックを開くとき)
+    // (閉じる=破棄ではなく非表示に留める。破棄は別のブックを開くとき)
     setTimeout(function () {
       if (!overlayOpen) document.body.classList.remove("player-closing");
     }, 380);
@@ -2006,156 +2218,155 @@
     else if (!overlayOpen && wantPlayer) openPlayerOverlay(wantPlayer);
   });
 
-  // ================= プレイヤー画面(没入) =================
+  // ================= プレイヤー画面(Now Playing・再構築版) =================
+  // 構成: 表紙既定の縦積み+下部アクション列 / 上部タブで表紙⇄スライド切替 /
+  // 下スクロールで章要約の縦積み / 全画面はタップ表示コントロール。
+  //
+  // 前回の描画で document/window/matchMedia に張ったリスナーの後始末。
+  // オーバーレイを閉じても音声は生かすため、後始末は「次の描画の直前」にだけ行う。
+  var playerCleanup = null;
+  function runPlayerCleanup() {
+    if (!playerCleanup) return;
+    try { playerCleanup(); } catch (e) { /* 後始末の失敗は無視 */ }
+    playerCleanup = null;
+  }
+
   function viewPlayer(bookId, hostEl) {
+    runPlayerCleanup();
     var lib = state.lib;
     var base = bookBase(lib, bookId);
     // hostEl があればオーバーレイ内へ描く(ページ遷移せず展開する経路)。
-    // 無い場合は従来どおり本文領域へ描く(?book= 直リンク・再読込)
+    // 無い場合は本文領域へ描く(?book= 直リンク・再読込)
     var content = hostEl || document.getElementById("content");
     content.textContent = "";
 
-    var glow = el("div", "glow");
-    glow.setAttribute("aria-hidden", "true");
-    content.appendChild(glow);
+    var cleanups = [];
+    playerCleanup = function () { cleanups.forEach(function (fn) { fn(); }); };
+    function on(target, ev, fn) {
+      target.addEventListener(ev, fn);
+      cleanups.push(function () { target.removeEventListener(ev, fn); });
+    }
 
-    var stage = el("div", "stage");
-    var pane = el("main", "playerpane");
-    pane.setAttribute("aria-label", "プレイヤー");
+    var wrap = el("div", "np-wrap mode-cover");
     // 静的な骨組みのみをinnerHTMLで作る(外部データは後から必ずtextContentで入れる)
-    pane.innerHTML =
-      '<div class="chrome">' +
-      '<a class="cbtn" id="dismiss" aria-label="プレイヤーを閉じる">' + I.chevD + '</a>' +
-      '<div class="ctx"><span class="s" id="ctxSeries"></span><span class="t" id="ctxTitle"></span></div>' +
-      '<button class="zoom-btn" id="zoomBtn" type="button" aria-label="スライドを最大化">' + I.expand + '</button>' +
-      '<a class="cbtn" id="toDetail" aria-label="ブック詳細">' + I.series + '</a>' +
+    wrap.innerHTML =
+      '<div class="np-bg" aria-hidden="true" id="npBg"></div>' +
+      '<div class="np-scroll" id="npScroll">' +
+      '<div class="np-top">' +
+      '<div class="row">' +
+      '<a class="np-icobtn" id="npClose" aria-label="プレイヤーを閉じる">' + I.chevD + '</a>' +
+      '<div class="np-seg" role="tablist" aria-label="メディア表示の切替">' +
+      '<button type="button" id="segCover" role="tab" aria-label="表紙表示">' + I.headph + '</button>' +
+      '<button type="button" id="segSlide" role="tab" aria-label="スライド表示">' + I.slideTab + '</button>' +
       '</div>' +
-      '<div id="resume"><span>前回の続き <b id="resumeAt"></b> から再開します</span><button id="resumeOff" type="button" aria-label="最初から再生">×</button></div>' +
+      '<a class="np-icobtn" id="npDetail" aria-label="ブック詳細">' + I.series + '</a>' +
+      '</div>' +
+      '<div class="np-compact">' +
+      '<span class="cc" id="ccCov"></span><span class="ct" id="ccTitle"></span>' +
+      '<button type="button" class="np-icobtn" id="ccPlay" aria-label="再生">' + I.playBig + '</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="np-media">' +
+      '<div class="np-cover" id="npCover"></div>' +
+      '<div class="np-stagebox" id="stagebox">' +
       '<section id="slide" aria-live="polite"></section>' +
-      '<div class="np-body" id="npBody" aria-live="polite"></div>' +
-      '<div class="ovl-bottom">' +
-      '<div class="counter">スライド <b id="mSlide">–</b> / <span id="mTotal">–</span></div>' +
-      '<div class="scrubber" aria-label="シークバー"><div class="scrub-track" id="track">' +
-      '<div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>' +
-      '<div class="times"><span id="tCur">0:00</span><span id="tRemain">−0:00</span></div></div>' +
-      '<div class="transport">' +
-      '<button class="speed" id="speed" type="button" aria-label="再生速度の変更"></button>' +
-      '<button class="tbtn small" id="prev" type="button" aria-label="前のスライド">' + I.prevSlide + '</button>' +
-      '<button class="tbtn skipnum" id="back10" type="button" aria-label="10秒戻す">' + I.back10 + '<span class="n">10</span></button>' +
-      '<button class="play-main" id="playBtn" type="button" aria-label="再生">' + I.playBig + '</button>' +
-      '<button class="tbtn skipnum" id="fwd10" type="button" aria-label="10秒進める">' + I.fwd10 + '<span class="n">10</span></button>' +
-      '<button class="tbtn small" id="next" type="button" aria-label="次のスライド">' + I.nextSlide + '</button>' +
+      '<div class="mctl" id="mctl">' +
+      '<div class="c-center">' +
+      '<button type="button" class="c-btn" id="cPrev" aria-label="前のチャプター">' + I.prevSlide + '</button>' +
+      '<button type="button" class="c-btn c-skip skipnum" id="cBack30" aria-label="30秒戻す">' + I.back10 + '<span class="n">30</span></button>' +
+      '<button type="button" class="c-btn c-play" id="cPlay" aria-label="再生">' + I.playBig + '</button>' +
+      '<button type="button" class="c-btn c-skip skipnum" id="cFwd30" aria-label="30秒進める">' + I.fwd10 + '<span class="n">30</span></button>' +
+      '<button type="button" class="c-btn" id="cNext" aria-label="次のチャプター">' + I.nextSlide + '</button>' +
       '</div>' +
-      '<div class="strip-head"><span class="h">スライド一覧</span><span class="sub">タップで移動</span></div>' +
-      '<div class="strip" id="strip" role="list"></div>' +
-      '<button class="list-btn" id="listBtn" type="button" aria-label="スライド一覧の表示切替">一覧</button>' +
+      '<div class="fs-top"><span class="t" id="fsTitle"></span></div>' +
+      '<div class="c-bottom"><span id="cTimes">0:00 / 0:00</span>' +
+      '<div class="c-track" id="cTrack"><div class="fill" id="cFill"></div></div>' +
+      '<button type="button" class="c-mini" id="cSpeed" aria-label="再生速度の変更">1.0×</button>' +
+      '<button type="button" class="c-mini" id="cTimer" aria-label="スリープタイマー">' + I.timer + '<span class="lb" id="cTimerLb"></span></button>' +
+      '</div>' +
+      '</div>' +
+      '<button type="button" class="np-fsbtn" id="fsBtn" aria-label="全画面表示">' + I.expand + '</button>' +
+      '</div>' +
+      '</div>' +
+      '<div class="np-head">' +
+      '<div class="np-resume" id="npResume"><span>前回の続き <b id="resumeAt"></b> から再開します</span>' +
+      '<button type="button" id="resumeOff">最初から</button></div>' +
+      '<div class="np-title"><h1 id="npTitle"></h1><div class="sub" id="npSub"></div></div>' +
+      '<div class="np-chips">' +
+      '<button type="button" class="np-chip" id="chipChapters">チャプター</button>' +
+      '<a class="np-chip" id="chipDetail">タイトル詳細</a>' +
+      '</div>' +
+      '<div class="np-seek" aria-label="シークバー"><div class="np-track" id="track">' +
+      '<div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>' +
+      '<div class="np-times"><span id="tCur">0:00</span><span class="mid" id="tMid"></span><span id="tRemain">−0:00</span></div></div>' +
+      '<div class="np-transport">' +
+      '<button type="button" class="np-tbtn" id="prev" aria-label="前のチャプター">' + I.prevSlide + '</button>' +
+      '<button type="button" class="np-tbtn skipnum" id="back30" aria-label="30秒戻す">' + I.back10 + '<span class="n">30</span></button>' +
+      '<button type="button" class="np-play" id="playBtn" aria-label="再生">' + I.playBig + '</button>' +
+      '<button type="button" class="np-tbtn skipnum" id="fwd30" aria-label="30秒進める">' + I.fwd10 + '<span class="n">30</span></button>' +
+      '<button type="button" class="np-tbtn" id="next" aria-label="次のチャプター">' + I.nextSlide + '</button>' +
+      '</div>' +
+      '<div class="np-actions">' +
+      '<button type="button" class="np-act" id="actSpeed"><span class="big" id="speedVal">1.0×</span><span class="lb">速度</span></button>' +
+      '<button type="button" class="np-act" id="actTimer"><span class="ic">' + I.timer + '</span><span class="lb" id="timerLb">タイマー</span></button>' +
+      '<a class="np-act" id="actDetail"><span class="ic">' + I.series + '</span><span class="lb">タイトル詳細</span></a>' +
+      '</div>' +
+      '<button type="button" class="np-hint" id="npHint">チャプター</button>' +
+      '</div>' +
+      '<div class="np-chapters" id="npChapters">' +
+      '<div class="np-ch-head"><span class="np-ch-tab">チャプター</span><span class="np-ch-count" id="chCount"></span></div>' +
+      '<div class="np-chlist" id="chList" role="list"></div>' +
+      '</div>' +
       '</div>' +
       '<audio id="audio" preload="metadata" style="display:none"></audio>';
-    stage.appendChild(pane);
-    content.appendChild(stage);
+    content.appendChild(wrap);
 
-    var dismissEl = document.getElementById("dismiss");
-    dismissEl.href = qs({ view: "book", book: bookId });
-    document.getElementById("toDetail").href = qs({ view: "book", book: bookId });
-    // オーバーレイで開いている場合、閉じるボタンはページ遷移せず縮小する
+    function $(id) { return document.getElementById(id); }
+
+    // ---- 閉じる/詳細への導線 ----
+    var closeEl = $("npClose");
+    closeEl.href = qs({ view: "book", book: bookId });
     if (hostEl) {
-      dismissEl.addEventListener("click", function (ev) {
+      closeEl.addEventListener("click", function (ev) {
         ev.preventDefault();
         closePlayerOverlay();
       });
     }
-
-    // ---- 没入モード(スライド最大化) ----
-    // 端末ごとに好みを記憶する。モバイルは既定で没入(縦画面ではこれが最も読める)
-    var isNarrow = window.matchMedia("(max-width: 760px)").matches;
-    var savedImmersive = lsGet("kikimiru.immersive");
-    var immersive = savedImmersive === null ? isNarrow : savedImmersive === "1";
-    var zoomBtn = document.getElementById("zoomBtn");
-    var hideTimer = null;
-
-    function showUI() {
-      document.body.classList.remove("ui-hidden");
-      if (hideTimer) clearTimeout(hideTimer);
-      // 再生中だけ自動で隠す(停止中は操作したいはずなので出したままにする)
-      var audioEl = document.getElementById("audio");
-      if (immersive && audioEl && !audioEl.paused) {
-        hideTimer = setTimeout(function () {
-          document.body.classList.add("ui-hidden");
-        }, 2600);
-      }
-    }
-    // オーバーレイの実高を測ってCSS変数へ入れる(内容や画面幅が変わっても追従する)
-    function measureOverlays() {
-      if (!immersive) return;
-      var chromeEl = document.querySelector(".chrome");
-      var ovlEl = document.querySelector(".ovl-bottom");
-      if (!chromeEl || !ovlEl) return;
-      var top = Math.round(chromeEl.getBoundingClientRect().height);
-      var bottom = Math.round(ovlEl.getBoundingClientRect().height);
-      document.body.style.setProperty("--ovl-top", top + "px");
-      document.body.style.setProperty("--ovl-bottom", bottom + "px");
-    }
-
-    function applyImmersive() {
-      document.body.classList.toggle("immersive", immersive);
-      zoomBtn.innerHTML = immersive ? I.collapse : I.expand;
-      zoomBtn.setAttribute("aria-label", immersive ? "最大化を解除" : "スライドを最大化");
-      if (!immersive) {
-        document.body.classList.remove("ui-hidden");
-        if (hideTimer) clearTimeout(hideTimer);
-      } else {
-        showUI();
-      }
-      // レイアウト確定後に測る(スライド一覧の生成前後で高さが変わるため2回)
-      requestAnimationFrame(measureOverlays);
-      setTimeout(measureOverlays, 300);
-    }
-    window.addEventListener("resize", measureOverlays);
-    zoomBtn.addEventListener("click", function () {
-      immersive = !immersive;
-      lsSet("kikimiru.immersive", immersive ? "1" : "0");
-      applyImmersive();
-    });
-    // 没入時のスライド一覧トグル(既定は畳んでスライドに面積を譲る)
-    document.getElementById("listBtn").addEventListener("click", function () {
-      document.body.classList.toggle("show-strip");
-      requestAnimationFrame(measureOverlays);
-      showUI();
-    });
-    // 操作の気配があればUIを出す(マウス移動・タップ・キー)
-    ["mousemove", "pointerdown", "keydown"].forEach(function (ev) {
-      document.addEventListener(ev, function () { if (immersive) showUI(); });
-    });
-    // 没入中にスライド面をタップ/クリックしたらUIの表示を切り替える
-    document.getElementById("slide").addEventListener("click", function () {
-      if (!immersive) return;
-      if (document.body.classList.contains("ui-hidden")) showUI();
-      else document.body.classList.add("ui-hidden");
+    ["npDetail", "chipDetail", "actDetail"].forEach(function (id) {
+      $(id).href = qs({ view: "book", book: bookId });
     });
 
-    // ---- 縦画面: 端末を横向きにすると全画面になることを初回だけ案内する ----
-    function isPortraitNarrow() {
-      return window.matchMedia("(orientation: portrait) and (max-width: 760px)").matches;
+    // ---- 表紙⇄スライドのタブ。選択は端末に記憶 ----
+    var npMode = lsGet("kikimiru.npTab") === "slide" ? "slide" : "cover";
+    var segCover = $("segCover"), segSlide = $("segSlide");
+    // スライドタブへ入った時の追加処理(データ読込後に差し込まれる。停止中はコントロール表示)
+    var onSlideMode = null;
+    function setMode(m, persist) {
+      npMode = m;
+      if (persist !== false) lsSet("kikimiru.npTab", m);
+      wrap.classList.toggle("mode-cover", m === "cover");
+      wrap.classList.toggle("mode-slide", m === "slide");
+      segCover.classList.toggle("cur", m === "cover");
+      segSlide.classList.toggle("cur", m === "slide");
+      segCover.setAttribute("aria-selected", m === "cover" ? "true" : "false");
+      segSlide.setAttribute("aria-selected", m === "slide" ? "true" : "false");
+      if (m === "slide" && onSlideMode) onSlideMode();
     }
-    function showRotateHint() {
-      if (!immersive || !isPortraitNarrow()) return;
-      if (lsGet("kikimiru.rothint") === "1") return;
-      lsSet("kikimiru.rothint", "1");
-      var hint = el("div", "rot-hint", "横向きにすると全画面で読めます");
-      document.body.appendChild(hint);
-      setTimeout(function () {
-        hint.style.opacity = "0";
-        setTimeout(function () { hint.remove(); }, 450);
-      }, 3500);
-    }
-    applyImmersive();
-    setTimeout(showRotateHint, 1200);
+    segCover.addEventListener("click", function () { setMode("cover"); });
+    segSlide.addEventListener("click", function () { setMode("slide"); });
+    setMode(npMode, false);
+
+    // スクロールで上部バーに地を敷き、表紙モードでは小型バーを出す
+    var scrollEl = $("npScroll");
+    scrollEl.addEventListener("scroll", function () {
+      wrap.classList.toggle("scrolled", scrollEl.scrollTop > 30);
+    });
 
     Promise.all([
       fetch(base + "deck.json").then(function (r) { if (!r.ok) throw new Error("deck.json " + r.status); return r.json(); }),
       // content.json は無くても動く(構造/本文分離): その場合はスライドID・種別のみ表示
       fetch(base + "content.json").then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      // 書誌(カバー・著者・シリーズ)はミニ情報として使う。取れなくても再生は成立させる
+      // 書誌(カバー・著者・シリーズ)。取れなくても再生は成立させる
       getBook(bookId).catch(function () { return null; })
     ]).then(function (res) {
       var deck = res[0];
@@ -2167,13 +2378,27 @@
       }
 
       var title = (typeof deck.title === "string" && deck.title) || bookId;
-      document.getElementById("ctxTitle").textContent = title;
+      $("npTitle").textContent = title;
+      $("ccTitle").textContent = title;
+      $("fsTitle").textContent = title;
+      var subParts = [];
+      if (meta && meta.authors && meta.authors.length) subParts.push(meta.authors.join(" / "));
       if (meta && meta.series) {
-        document.getElementById("ctxSeries").textContent =
-          meta.series.name + (meta.series.sequence ? " #" + meta.series.sequence : "");
+        subParts.push(meta.series.name + (meta.series.sequence ? " #" + meta.series.sequence : ""));
       }
+      $("npSub").textContent = subParts.join(" · ");
       document.title = title + " — kikimiru";
       if (!res[1]) warn("content.json が無いため、スライドは構成情報のみ表示しています。");
+
+      // 表紙(正方形ボックス・小型バー)とぼかし背景
+      coverInto($("npCover"), lib, bookId, meta && meta.cover, title);
+      coverInto($("ccCov"), lib, bookId, meta && meta.cover, title, true);
+      if (meta && meta.cover) {
+        var bgImg = document.createElement("img");
+        bgImg.alt = "";
+        bgImg.src = bookBase(lib, bookId) + encodeURIComponent(meta.cover);
+        $("npBg").appendChild(bgImg);
+      }
 
       if ("mediaSession" in navigator) {
         var msMeta = { title: title, artist: (meta && meta.authors && meta.authors.join(" / ")) || "kikimiru" };
@@ -2183,7 +2408,7 @@
         navigator.mediaSession.metadata = new MediaMetadata(msMeta);
       }
 
-      var audio = document.getElementById("audio");
+      var audio = $("audio");
 
       // audio.src の組み立て前にファイル名を検証する(パス区切り・親ディレクトリ参照・
       // クエリ/フラグメントの混入を拒否し、意図しないリクエストになるのを防ぐ)
@@ -2210,10 +2435,8 @@
 
       function dur() { return audio.duration || (deck.audio && deck.audio.duration) || 0; }
 
-      document.getElementById("mTotal").textContent = String(cues.length);
-
       // ---- スライド描画 ----
-      var slideEl = document.getElementById("slide");
+      var slideEl = $("slide");
 
       // 画像スライド(v2.1)のパス検証とURL化。各セグメントを個別に検査・エンコード
       function slideImageUrl(image) {
@@ -2239,6 +2462,7 @@
         imgCache[url] = im;
       }
 
+      var chapEls = [];
       function render(i) {
         var cue = cues[i];
         var sm = slideMeta[cue.slide] || {};
@@ -2275,11 +2499,8 @@
           img.className = "slide-img";
           img.alt = (typeof body.alt === "string" && body.alt) || body.title || cue.slide;
           if (!readyNow) {
-            // 未読込のときだけ load を待つ(この間はテキスト面が見えるが、
-            // 先読みが効いていれば通常ここへは来ない)
             img.addEventListener("load", function () { slideEl.classList.add("has-img"); });
           }
-          // ロード失敗時はテキスト面がそのまま見える(has-imgを外す)
           img.addEventListener("error", function () {
             img.remove();
             slideEl.classList.remove("has-img");
@@ -2288,39 +2509,18 @@
           if (!imgCache[imgUrl]) imgCache[imgUrl] = img;
           slideEl.appendChild(img);
         }
-        // 縦画面(YTM構造)ではスライドの下に本文を出す。画像スライドでも
-        // 意味層(alt/bullets)があるので、小さい画面でも内容が読める
-        var np = document.getElementById("npBody");
-        if (np) {
-          np.textContent = "";
-          np.appendChild(el("div", "np-title", body.title || cue.slide));
-          np.appendChild(el("div", "np-sub", kindLabel + " · " + (i + 1) + " / " + cues.length));
-          if (body.bullets && body.bullets.length) {
-            var npul = document.createElement("ul");
-            body.bullets.forEach(function (bl) {
-              npul.appendChild(el("li", null, bl));
-            });
-            np.appendChild(npul);
-          } else if (typeof body.alt === "string" && body.alt) {
-            np.appendChild(el("p", "np-alt", body.alt));
-          }
-          if (body.note) np.appendChild(el("div", "note", body.note));
-        }
 
         // 前後2枚を先読みしておく(逆再生・シークでもチラつかせない)
         prefetchSlideImage(i + 1);
         prefetchSlideImage(i + 2);
         prefetchSlideImage(i - 1);
-        document.getElementById("mSlide").textContent = String(i + 1);
-        // フィルムストリップの状態更新
-        var thumbs = document.querySelectorAll("#strip .thumb");
-        thumbs.forEach(function (elm, j) {
+
+        // チャプターリストの現在位置(いま流れている章をハイライト)
+        chapEls.forEach(function (elm, j) {
           elm.classList.toggle("cur", j === i);
-          elm.classList.toggle("played", j < i);
           if (j === i) elm.setAttribute("aria-current", "true");
           else elm.removeAttribute("aria-current");
         });
-        if (thumbs[i]) thumbs[i].scrollIntoView({ block: "nearest", inline: "nearest" });
       }
 
       function cueAt(t) {
@@ -2329,92 +2529,99 @@
         return i;
       }
 
-      // ---- スクラバー ----
-      var track = document.getElementById("track");
-      var fill = document.getElementById("fill");
-      var knob = document.getElementById("knob");
+      // ---- シークバー(本体+メディア面内の2本を同時に塗る) ----
+      var fillEl = $("fill"), knobEl = $("knob"), cFillEl = $("cFill");
+      function remainLabel(sec) {
+        sec = Math.max(0, Math.ceil(sec));
+        var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+        if (h > 0) return "残り" + h + "時間" + m + "分";
+        if (sec >= 60) return "残り" + m + "分";
+        return "残り" + sec + "秒";
+      }
       function paintScrub() {
         var d = dur();
         var pct = d > 0 ? Math.min(1, audio.currentTime / d) : 0;
-        fill.style.width = (pct * 100) + "%";
-        knob.style.left = (pct * 100) + "%";
-        document.getElementById("tCur").textContent = fmt(audio.currentTime);
-        document.getElementById("tRemain").textContent = "−" + fmt(Math.max(0, d - audio.currentTime));
+        fillEl.style.width = (pct * 100) + "%";
+        knobEl.style.left = (pct * 100) + "%";
+        cFillEl.style.width = (pct * 100) + "%";
+        $("tCur").textContent = fmt(audio.currentTime);
+        $("tRemain").textContent = "−" + fmt(Math.max(0, d - audio.currentTime));
+        // 中央は再生速度で換算した残り時間
+        var rate2 = audio.playbackRate || 1;
+        $("tMid").textContent = d > 0 ? remainLabel((d - audio.currentTime) / rate2) : "";
+        $("cTimes").textContent = fmt(audio.currentTime) + " / " + fmt(d);
       }
       // cue位置の目盛(メタデータ取得後に配置。deck.audio.durationがあれば先に描ける)
       function paintCueDots() {
         var d = dur();
         if (!d) return;
-        track.querySelectorAll(".cue").forEach(function (c) { c.remove(); });
-        cues.forEach(function (cue, i) {
-          if (i === 0) return;
-          var dot = el("span", "cue");
-          dot.style.left = (cue.t / d * 100) + "%";
-          track.appendChild(dot);
+        [$("track"), $("cTrack")].forEach(function (trackEl) {
+          trackEl.querySelectorAll(".cue").forEach(function (c) { c.remove(); });
+          cues.forEach(function (cue, i) {
+            if (i === 0) return;
+            var dot = el("span", "cue");
+            dot.style.left = (cue.t / d * 100) + "%";
+            trackEl.appendChild(dot);
+          });
         });
       }
       paintCueDots();
       audio.addEventListener("loadedmetadata", paintCueDots);
-      function scrubTo(clientX) {
-        var rect = track.getBoundingClientRect();
-        var pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-        var d = dur();
-        if (d > 0) { audio.currentTime = pct * d; paintScrub(); }
+      function bindScrub(trackEl) {
+        var dragging = false;
+        function toPos(ev) {
+          var rect = trackEl.getBoundingClientRect();
+          var pct = Math.min(1, Math.max(0, (ev.clientX - rect.left) / rect.width));
+          var d = dur();
+          if (d > 0) { audio.currentTime = pct * d; paintScrub(); }
+        }
+        trackEl.addEventListener("pointerdown", function (ev) {
+          dragging = true;
+          trackEl.setPointerCapture(ev.pointerId);
+          toPos(ev);
+          // メディア内シークのドラッグ中は自動非表示を止める(離した時に再アーム)
+          if (trackEl.id === "cTrack") {
+            showCtl();
+            if (ctlTimer) { clearTimeout(ctlTimer); ctlTimer = null; }
+          }
+        });
+        trackEl.addEventListener("pointermove", function (ev) { if (dragging) toPos(ev); });
+        trackEl.addEventListener("pointerup", function () {
+          dragging = false;
+          if (trackEl.id === "cTrack") armCtl();
+        });
       }
-      var dragging = false;
-      track.addEventListener("pointerdown", function (ev) {
-        dragging = true;
-        track.setPointerCapture(ev.pointerId);
-        scrubTo(ev.clientX);
-      });
-      track.addEventListener("pointermove", function (ev) { if (dragging) scrubTo(ev.clientX); });
-      track.addEventListener("pointerup", function () { dragging = false; });
+      bindScrub($("track"));
+      bindScrub($("cTrack"));
 
-      // ---- 再生/一時停止 ----
-      var playBtn = document.getElementById("playBtn");
+      // ---- 再生/一時停止(本体・メディア面・小型バーの3ボタンを同期) ----
+      var playBtns = [$("playBtn"), $("cPlay"), $("ccPlay")];
       function paintPlay() {
-        playBtn.innerHTML = audio.paused ? I.playBig : I.pauseBig;
-        playBtn.setAttribute("aria-label", audio.paused ? "再生" : "一時停止");
+        var paused = audio.paused;
+        playBtns.forEach(function (b) {
+          b.innerHTML = paused ? I.playBig : I.pauseBig;
+          b.setAttribute("aria-label", paused ? "再生" : "一時停止");
+        });
       }
-      playBtn.addEventListener("click", function () {
+      function togglePlay() {
         if (audio.paused) audio.play().catch(function () {});
         else audio.pause();
-      });
+      }
+      playBtns.forEach(function (b) { b.addEventListener("click", togglePlay); });
       audio.addEventListener("play", paintPlay);
       audio.addEventListener("pause", paintPlay);
       paintPlay();
-      // 再生を始めたら操作UIを自動的に引っ込める(没入時)。停止したら出したままにする
-      audio.addEventListener("play", showUI);
-      audio.addEventListener("pause", showUI);
 
-      // ---- ±10秒 ----
-      document.getElementById("back10").addEventListener("click", function () {
-        audio.currentTime = Math.max(0, audio.currentTime - 10);
-      });
-      document.getElementById("fwd10").addEventListener("click", function () {
-        audio.currentTime = Math.min(dur() || Infinity, audio.currentTime + 10);
-      });
+      // ---- ±30秒スキップ ----
+      function back30() { audio.currentTime = Math.max(0, audio.currentTime - 30); }
+      function fwd30() { audio.currentTime = Math.min(dur() || Infinity, audio.currentTime + 30); }
+      $("back30").addEventListener("click", back30);
+      $("fwd30").addEventListener("click", fwd30);
+      // デスクトップのオーバーレイ内 ±30秒(メディア面に全操作を集約)
+      $("cBack30").addEventListener("click", back30);
+      $("cFwd30").addEventListener("click", fwd30);
 
-      // ---- 速度(サイクル式・端末に記憶) ----
-      var RATES = [0.75, 1.0, 1.25, 1.5, 2.0];
-      var rate = parseFloat(lsGet("kikimiru.rate") || "1") || 1.0;
-      if (RATES.indexOf(rate) === -1) rate = 1.0;
-      var speedBtn = document.getElementById("speed");
-      function applyRate() {
-        audio.playbackRate = rate;
-        speedBtn.textContent = rate.toFixed(2).replace(/0$/, "").replace(/\.0$/, ".0") + "×";
-        speedBtn.setAttribute("aria-label", "再生速度 " + rate + "倍(タップで変更)");
-      }
-      speedBtn.addEventListener("click", function () {
-        rate = RATES[(RATES.indexOf(rate) + 1) % RATES.length];
-        lsSet("kikimiru.rate", String(rate));
-        applyRate();
-      });
-      applyRate();
-      // playbackRateはsrc設定後にリセットされる環境があるため再適用
-      audio.addEventListener("loadedmetadata", function () { audio.playbackRate = rate; });
-
-      // ---- 前後スライド ----
+      // ---- 前後チャプター ----
       function seekTo(i) {
         audio.currentTime = cues[i].t + 0.01;
         if (audio.paused) {
@@ -2422,10 +2629,136 @@
           audio.play().catch(function () {});
         }
       }
-      document.getElementById("prev").addEventListener("click", function () { seekTo(Math.max(0, cur - 1)); });
-      document.getElementById("next").addEventListener("click", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
+      function prevChap() { seekTo(Math.max(0, cur - 1)); }
+      function nextChap() { seekTo(Math.min(cues.length - 1, cur + 1)); }
+      $("prev").addEventListener("click", prevChap);
+      $("next").addEventListener("click", nextChap);
+      $("cPrev").addEventListener("click", prevChap);
+      $("cNext").addEventListener("click", nextChap);
 
-      // ロック画面のスクラバー対応(位置情報の通知。5秒間引きで十分)
+      // ---- 選択ポップアップ(速度・タイマー共通。ボタンの近くに出す) ----
+      var popEl = null;
+      function closePop() {
+        if (!popEl) return;
+        popEl.remove();
+        popEl = null;
+        document.removeEventListener("pointerdown", popOutside, true);
+        document.removeEventListener("keydown", popEsc, true);
+        armCtl();
+      }
+      function popOutside(ev) { if (popEl && !popEl.contains(ev.target)) closePop(); }
+      function popEsc(ev) { if (ev.key === "Escape") { ev.stopPropagation(); closePop(); } }
+      function showPop(anchor, items, onPick) {
+        if (popEl) { closePop(); }
+        popEl = el("div", "np-pop");
+        popEl.setAttribute("role", "menu");
+        items.forEach(function (it) {
+          var b = document.createElement("button");
+          b.type = "button";
+          b.className = "np-pop-item" + (it.current ? " cur" : "");
+          b.setAttribute("role", "menuitemradio");
+          b.setAttribute("aria-checked", it.current ? "true" : "false");
+          b.textContent = it.label;
+          b.addEventListener("click", function () {
+            closePop();
+            onPick(it.value);
+          });
+          popEl.appendChild(b);
+        });
+        // ネイティブ全画面中は top layer 内へ入れないと見えない
+        (document.fullscreenElement || document.body).appendChild(popEl);
+        var r = anchor.getBoundingClientRect();
+        var pr = popEl.getBoundingClientRect();
+        var x = Math.min(Math.max(8, r.left + r.width / 2 - pr.width / 2),
+                         window.innerWidth - pr.width - 8);
+        var y = r.top - pr.height - 8;
+        if (y < 8) y = r.bottom + 8;
+        popEl.style.left = x + "px";
+        popEl.style.top = y + "px";
+        // ポップアップ表示中はコントロールを自動で消さない
+        if (ctlTimer) { clearTimeout(ctlTimer); ctlTimer = null; }
+        setTimeout(function () {
+          document.addEventListener("pointerdown", popOutside, true);
+          document.addEventListener("keydown", popEsc, true);
+        }, 0);
+      }
+      cleanups.push(closePop);
+
+      // ---- 速度(ポップアップ選択・端末に記憶) ----
+      var RATES = [0.75, 1.0, 1.25, 1.5, 2.0];
+      var rate = parseFloat(lsGet("kikimiru.rate") || "1") || 1.0;
+      if (RATES.indexOf(rate) === -1) rate = 1.0;
+      var speedVal = $("speedVal");
+      function rateLabel(r) {
+        return r.toFixed(2).replace(/0$/, "").replace(/\.0$/, ".0") + "×";
+      }
+      function applyRate() {
+        audio.playbackRate = rate;
+        speedVal.textContent = rateLabel(rate);
+        $("cSpeed").textContent = speedVal.textContent;
+        $("actSpeed").setAttribute("aria-label", "再生速度 " + rate + "倍(タップで選択)");
+        paintScrub();
+      }
+      function openSpeedPop(anchor) {
+        showPop(anchor, RATES.map(function (r) {
+          return { label: rateLabel(r), value: r, current: r === rate };
+        }), function (v) {
+          rate = v;
+          lsSet("kikimiru.rate", String(rate));
+          applyRate();
+        });
+      }
+      $("actSpeed").addEventListener("click", function () { openSpeedPop(this); });
+      $("cSpeed").addEventListener("click", function () { openSpeedPop(this); });
+      applyRate();
+      // playbackRateはsrc設定後にリセットされる環境があるため再適用
+      audio.addEventListener("loadedmetadata", function () { audio.playbackRate = rate; });
+
+      // ---- スリープタイマー(ポップアップ選択。終了時に一時停止) ----
+      var TIMER_MIN = [0, 15, 30, 45, 60];
+      var timerMin = 0, timerDeadline = 0, timerTick = null;
+      var timerLb = $("timerLb"), actTimer = $("actTimer");
+      var cTimerBtn = $("cTimer"), cTimerLb = $("cTimerLb");
+      function stopTimer() {
+        if (timerTick) { clearInterval(timerTick); timerTick = null; }
+        timerDeadline = 0;
+        timerMin = 0;
+        timerLb.textContent = "タイマー";
+        actTimer.classList.remove("on");
+        cTimerBtn.classList.remove("on");
+        cTimerLb.textContent = "";
+      }
+      cleanups.push(stopTimer);
+      function setSleepTimer(min) {
+        if (!min) { stopTimer(); return; }
+        timerMin = min;
+        timerDeadline = Date.now() + min * 60000;
+        actTimer.classList.add("on");
+        cTimerBtn.classList.add("on");
+        timerLb.textContent = min + "分";
+        cTimerLb.textContent = min + "分";
+        if (!timerTick) {
+          timerTick = setInterval(function () {
+            var left = timerDeadline - Date.now();
+            if (left <= 0) {
+              audio.pause();
+              stopTimer();
+              return;
+            }
+            timerLb.textContent = fmt(left / 1000);
+            cTimerLb.textContent = fmt(left / 1000);
+          }, 1000);
+        }
+      }
+      function openTimerPop(anchor) {
+        showPop(anchor, TIMER_MIN.map(function (m) {
+          return { label: m ? m + "分" : "オフ", value: m, current: m === timerMin };
+        }), setSleepTimer);
+      }
+      actTimer.addEventListener("click", function () { openTimerPop(this); });
+      cTimerBtn.addEventListener("click", function () { openTimerPop(this); });
+
+      // ロック画面のスクラバー対応(位置情報の通知)
       function updatePositionState() {
         if (!("mediaSession" in navigator) || !("setPositionState" in navigator.mediaSession)) return;
         var d = dur();
@@ -2440,16 +2773,16 @@
       }
 
       if ("mediaSession" in navigator) {
-        navigator.mediaSession.setActionHandler("previoustrack", function () { seekTo(Math.max(0, cur - 1)); });
-        navigator.mediaSession.setActionHandler("nexttrack", function () { seekTo(Math.min(cues.length - 1, cur + 1)); });
+        navigator.mediaSession.setActionHandler("previoustrack", prevChap);
+        navigator.mediaSession.setActionHandler("nexttrack", nextChap);
         try {
           navigator.mediaSession.setActionHandler("play", function () { audio.play().catch(function () {}); });
           navigator.mediaSession.setActionHandler("pause", function () { audio.pause(); });
           navigator.mediaSession.setActionHandler("seekbackward", function () {
-            audio.currentTime = Math.max(0, audio.currentTime - 10);
+            audio.currentTime = Math.max(0, audio.currentTime - 30);
           });
           navigator.mediaSession.setActionHandler("seekforward", function () {
-            audio.currentTime = Math.min(dur() || Infinity, audio.currentTime + 10);
+            audio.currentTime = Math.min(dur() || Infinity, audio.currentTime + 30);
           });
           navigator.mediaSession.setActionHandler("seekto", function (detail) {
             if (detail.fastSeek && "fastSeek" in audio) { audio.fastSeek(detail.seekTime); }
@@ -2461,24 +2794,163 @@
         audio.addEventListener("ratechange", updatePositionState);
       }
 
-      // ---- キーボード操作(Space=再生/停止・←→=前後スライド) ----
-      document.addEventListener("keydown", function (ev) {
+      // ---- メディア面のタップ表示コントロール ----
+      var stagebox = $("stagebox");
+      var ctlTimer = null;
+      function armCtl() {
+        if (ctlTimer) clearTimeout(ctlTimer);
+        ctlTimer = null;
+        if (!audio.paused) {
+          ctlTimer = setTimeout(function () { stagebox.classList.remove("ctl"); }, 2600);
+        }
+      }
+      function showCtl() {
+        stagebox.classList.add("ctl");
+        armCtl();
+      }
+      cleanups.push(function () { if (ctlTimer) clearTimeout(ctlTimer); });
+      // スライドタブへ入った時: 停止中、またはチャプターへスクロール済み
+      // (=スライド面が唯一の操作場所)ならコントロールを出す
+      onSlideMode = function () {
+        if (audio.paused || wrap.classList.contains("scrolled")) showCtl();
+      };
+      // マウス操作はホバーで表示+面クリック=再生/一時停止。
+      // タッチ操作はタップで開閉。タッチ+マウス両対応機のため、環境の一発判定でなく
+      // 直前のポインタ種別で毎回分岐する
+      var hoverCapable = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+      var lastPointerType = hoverCapable ? "mouse" : "touch";
+      stagebox.addEventListener("pointerdown", function (ev) {
+        if (ev.pointerType) lastPointerType = ev.pointerType;
+      });
+      stagebox.addEventListener("click", function (ev) {
+        // ボタン・シークバーへのタップはコントロールの開閉として扱わない。
+        // ボタン側のハンドラが innerHTML でアイコンを差し替えると ev.target が
+        // DOMから切り離され closest が効かなくなるため、切り離しも「ボタン操作」とみなす
+        if (!ev.target.isConnected ||
+            ev.target.closest("button") || ev.target.closest(".c-track")) return;
+        if (lastPointerType === "mouse") { togglePlay(); return; }
+        if (stagebox.classList.contains("ctl")) stagebox.classList.remove("ctl");
+        else showCtl();
+      });
+      if (hoverCapable) {
+        stagebox.addEventListener("mousemove", function () { showCtl(); });
+        stagebox.addEventListener("mouseleave", function () {
+          if (!audio.paused) stagebox.classList.remove("ctl");
+        });
+      }
+      // マウスクリック後にボタンへフォーカスが残ると Space がそのボタンを再発火して
+      // ショートカットが死ぬため、マウス起点のクリックに限り外す(Tab操作は維持)
+      wrap.addEventListener("click", function (ev) {
+        if (ev.detail > 0 && ev.target.isConnected) {
+          var b = ev.target.closest("button");
+          if (b) b.blur();
+        }
+      });
+      audio.addEventListener("play", function () { paintScrub(); armCtl(); });
+      audio.addEventListener("pause", function () { showCtl(); });
+      // チャプター側へスクロールした瞬間はコントロールを出す(本体トランスポートが
+      // 画面外になり、固定されたスライド面が唯一の操作場所になるため)。
+      // 読込前のスクロールで既に scrolled のことがあるため、現在の状態で初期化する
+      var wasScrolled = wrap.classList.contains("scrolled");
+      if (wasScrolled && npMode === "slide") showCtl();
+      scrollEl.addEventListener("scroll", function () {
+        var sc = wrap.classList.contains("scrolled");
+        if (sc === wasScrolled) return;
+        wasScrolled = sc;
+        if (sc && npMode === "slide") showCtl();
+      });
+
+      // ---- 全画面(⛶ / 端末を横向きで自動) ----
+      var fsOn = false, tabBeforeFs = null;
+      var fsBtn = $("fsBtn");
+      function paintFsBtn() {
+        fsBtn.innerHTML = fsOn ? I.collapse : I.expand;
+        fsBtn.setAttribute("aria-label", fsOn ? "全画面を終了" : "全画面表示");
+      }
+      function enterFs(userGesture) {
+        if (fsOn) return;
+        closePop();
+        fsOn = true;
+        // 表紙モードから入った場合はスライド面へ切り替える(戻る時に復元)
+        if (npMode !== "slide") { tabBeforeFs = npMode; setMode("slide", false); }
+        document.body.classList.add("np-fs");
+        showCtl();
+        paintFsBtn();
+        // ユーザー操作起点のときだけネイティブ全画面+横向き固定を試みる
+        // (回転による自動切替はCSSの全画面化だけで成立している)
+        if (userGesture && stagebox.requestFullscreen) {
+          stagebox.requestFullscreen({ navigationUI: "hide" }).then(function () {
+            if (screen.orientation && screen.orientation.lock) {
+              return screen.orientation.lock("landscape").catch(function () {});
+            }
+          }).catch(function () {});
+        }
+      }
+      function exitFs() {
+        if (!fsOn) return;
+        closePop();
+        fsOn = false;
+        document.body.classList.remove("np-fs");
+        paintFsBtn();
+        if (document.fullscreenElement) {
+          document.exitFullscreen().catch(function () {});
+        }
+        try {
+          if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+        } catch (e) { /* 未対応環境は無視 */ }
+        if (tabBeforeFs) { setMode(tabBeforeFs, false); tabBeforeFs = null; }
+        // 復帰先がスライド面ならコントロールを一度出す(スクロール済みで本体
+        // トランスポートが画面外でも、操作の手がかりが残るように)
+        if (npMode === "slide") showCtl();
+      }
+      // 全画面の終了は右下⛶に一本化する(上部バーには置かない。二重表示のレビュー指摘対応)
+      fsBtn.addEventListener("click", function () { fsOn ? exitFs() : enterFs(true); });
+      on(document, "fullscreenchange", function () {
+        // ブラウザ側の操作(Esc等)でネイティブ全画面が解けたらUIも追従させる
+        if (!document.fullscreenElement && fsOn) exitFs();
+      });
+      cleanups.push(function () {
+        document.body.classList.remove("np-fs");
+      });
+
+      // 端末の回転に追従: 横向き=全画面 / 縦向き=通常(タッチ端末のみ)
+      var mqLand = window.matchMedia("(orientation: landscape)");
+      var mqTouch = window.matchMedia("(hover: none) and (pointer: coarse)");
+      function onOrient() {
+        if (!mqTouch.matches) return;
+        var active = document.body.classList.contains("player-open") ||
+                     document.body.classList.contains("mode-player");
+        if (!active) return;
+        if (mqLand.matches) enterFs(false);
+        else exitFs();
+      }
+      if (mqLand.addEventListener) {
+        on(mqLand, "change", onOrient);
+      } else if (mqLand.addListener) {
+        mqLand.addListener(onOrient);
+        cleanups.push(function () { mqLand.removeListener(onOrient); });
+      }
+
+      // ---- キーボード操作(Space=再生/停止・←→=前後章・F=全画面) ----
+      function onKey(ev) {
+        // オーバーレイを閉じてバックグラウンド再生中はショートカットを奪わない
+        if (hostEl && !document.body.classList.contains("player-open")) return;
         var tg = ev.target;
         if (tg && /^(INPUT|SELECT|TEXTAREA|BUTTON|AUDIO)$/.test(tg.tagName)) return;
         if (ev.key === " ") {
           ev.preventDefault();
-          if (audio.paused) audio.play().catch(function () {});
-          else audio.pause();
+          togglePlay();
         } else if (ev.key === "ArrowLeft") {
-          seekTo(Math.max(0, cur - 1));
+          prevChap();
         } else if (ev.key === "ArrowRight") {
-          seekTo(Math.min(cues.length - 1, cur + 1));
+          nextChap();
         } else if (ev.key === "f" || ev.key === "F") {
-          zoomBtn.click();   // 最大化のトグル
-        } else if (ev.key === "Escape" && immersive) {
-          zoomBtn.click();   // 最大化の解除
+          fsOn ? exitFs() : enterFs(true);
+        } else if (ev.key === "Escape" && fsOn) {
+          exitFs();
         }
-      });
+      }
+      on(document, "keydown", onKey);
 
       // ---- 進行と保存 ----
       var lastSaved = 0;
@@ -2500,31 +2972,32 @@
           savePos(lib, bookId, audio.currentTime, dur(), cur + 1, cues.length);
         }
       }
-      window.addEventListener("pagehide", saveNow);
-      document.addEventListener("visibilitychange", function () {
+      on(window, "pagehide", saveNow);
+      function onVisibility() {
         if (document.visibilityState === "hidden") saveNow();
-      });
+      }
+      on(document, "visibilitychange", onVisibility);
       audio.addEventListener("pause", saveNow);
 
       // 端末間同期: 再生中は30秒ごと、停止・離脱時は即時に送る
-      // (saveNow が先に登録済みのため、送信時にはdirtyが最新化されている)
-      setInterval(function () { if (!audio.paused) syncProgressUp(); }, 30000);
+      var syncHandle = setInterval(function () { if (!audio.paused) syncProgressUp(); }, 30000);
+      cleanups.push(function () { clearInterval(syncHandle); });
       audio.addEventListener("pause", function () { syncProgressUp(); });
-      window.addEventListener("pagehide", function () { syncProgressUp(true); });
+      on(window, "pagehide", function () { syncProgressUp(true); });
 
       // ---- 前回の続きから再開(先頭・末尾付近の保存値は無視する) ----
       // ?restart=1(詳細画面の「最初から再生」)なら保存値を破棄して先頭から
       if (params.get("restart")) clearPos(lib, bookId);
       var saved = loadPos(lib, bookId);
       if (saved && saved.t > 10 && (!saved.d || saved.t < saved.d - 5)) {
-        var bar = document.getElementById("resume");
+        var bar = $("npResume");
         var resumeDismissed = false;
         bar.style.display = "flex";
-        document.getElementById("resumeAt").textContent = fmt(saved.t);
+        $("resumeAt").textContent = fmt(saved.t);
         audio.addEventListener("loadedmetadata", function () {
           if (!resumeDismissed) { audio.currentTime = saved.t; paintScrub(); }
         }, { once: true });
-        document.getElementById("resumeOff").addEventListener("click", function () {
+        $("resumeOff").addEventListener("click", function () {
           resumeDismissed = true;
           bar.style.display = "none";
           audio.currentTime = 0;
@@ -2532,8 +3005,7 @@
           render(cueAt(0));
           paintScrub();
         });
-        // 用が済んだら自動的に引っ込める(6秒。スライド面を長く覆わない)。
-        // 「最初から」を押す機会は残しつつ、押されなければ黙って消える
+        // 用が済んだら自動的に引っ込める(6秒)。押されなければ黙って消える
         setTimeout(function () {
           if (resumeDismissed) return;
           bar.style.transition = "opacity .4s linear";
@@ -2544,25 +3016,54 @@
         }, 6000);
       }
 
-      // ---- フィルムストリップ ----
-      var strip = document.getElementById("strip");
+      // ---- チャプターリスト(番号+時刻+見出し+要点。タップでシーク) ----
+      var chList = $("chList");
       cues.forEach(function (cue, i) {
         var body = bodyMap[cue.slide] || {};
         var b = document.createElement("button");
         b.type = "button";
-        b.className = "thumb";
+        b.className = "np-chap";
         b.setAttribute("role", "listitem");
-        var row = el("span", "row");
-        row.appendChild(el("span", "no", String(i + 1)));
-        row.appendChild(el("span", "tm", fmt(cue.t)));
-        b.appendChild(row);
-        b.appendChild(el("span", "tt", body.title || cue.slide));
+        var no = el("span", "no");
+        no.appendChild(el("b", null, String(i + 1).padStart(2, "0")));
+        no.appendChild(el("span", "tm", fmt(cue.t)));
+        b.appendChild(no);
+        var bd = el("span", "bd");
+        bd.appendChild(el("span", "tt", body.title || cue.slide));
+        if (body.bullets && body.bullets.length) {
+          var ul = document.createElement("ul");
+          body.bullets.forEach(function (bl) {
+            var li = document.createElement("li");
+            li.textContent = bl;
+            ul.appendChild(li);
+          });
+          bd.appendChild(ul);
+        } else if (typeof body.alt === "string" && body.alt) {
+          bd.appendChild(el("div", "alt", body.alt));
+        }
+        if (body.note) bd.appendChild(el("div", "nt", body.note));
+        b.appendChild(bd);
+        // aria-label は付けない: button の可視テキスト(番号・時刻・見出し・要点)を
+        // そのままアクセシブルネームにする(上書きすると要点が読み上げから消える)
         b.addEventListener("click", function () { seekTo(i); });
-        strip.appendChild(b);
+        chList.appendChild(b);
+        chapEls.push(b);
       });
+      $("chCount").textContent = "全" + cues.length + "章";
+      $("chipChapters").textContent = "チャプター " + cues.length;
+      $("npHint").textContent = "チャプター(" + cues.length + ")";
 
-      // 画像スライドのブックは全枚を裏で先読みしておく(切替のチラつきを完全に無くす。
-      // 画像は1枚あたり数十〜数百KBで、シーク主体の使い方でも待たされないことを優先する)
+      // チャプターへのスクロール(チップ/下部の取っ手から)
+      function scrollToChapters() {
+        // 固定される高さ = 上部バー + (スライドモードなら貼り付くメディア面 / 表紙は小型バー)
+        var mediaEl = wrap.querySelector(".np-media");
+        var pinned = 52 + (npMode === "slide" ? mediaEl.offsetHeight : 58);
+        scrollEl.scrollTo({ top: $("npChapters").offsetTop - pinned, behavior: "smooth" });
+      }
+      $("chipChapters").addEventListener("click", scrollToChapters);
+      $("npHint").addEventListener("click", scrollToChapters);
+
+      // 画像スライドのブックは全枚を裏で先読みしておく(切替のチラつきを完全に無くす)
       if (cues.some(function (c) { return (slideMeta[c.slide] || {}).image; })) {
         cues.forEach(function (_c, i) { prefetchSlideImage(i); });
       }
@@ -2570,6 +3071,10 @@
       cur = 0;
       render(0);
       paintScrub();
+      // スライドモードで停止中はコントロールを出しておく(操作場所が最初から分かるように)
+      if (npMode === "slide" && audio.paused) showCtl();
+      // すでに横向きで開いた場合は最初から全画面にする
+      onOrient();
     }).catch(function (e) {
       warn("ブックを読み込めませんでした: " + (e.message || e));
     });

@@ -1,6 +1,10 @@
 # ユーザーライブラリ(手元のコンテンツ)はコミットしない
 /library/
 
+# レビュー報告bundle(参照アプリのスクショ・名称を含むローカル資料。公開リポジトリに含めない)
+/reviews/
+/scratchpad/
+
 __pycache__/
 *.pyc
 .DS_Store
