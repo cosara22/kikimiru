@@ -1727,11 +1727,17 @@
         }
         return base + segs.map(encodeURIComponent).join("/");
       }
+      // 先読み済み画像の保持。切替時に「読み込み済みか」を同期的に判定できるようにし、
+      // テキスト面が一瞬見えてから画像に差し替わる(チラつき)のを防ぐ
+      var imgCache = Object.create(null);
       function prefetchSlideImage(i) {
         if (i < 0 || i >= cues.length) return;
         var sm2 = slideMeta[cues[i].slide] || {};
         var url = slideImageUrl(sm2.image);
-        if (url) { var im = new Image(); im.src = url; }
+        if (!url || imgCache[url]) return;
+        var im = new Image();
+        im.src = url;
+        imgCache[url] = im;
       }
 
       function render(i) {
@@ -1739,7 +1745,12 @@
         var sm = slideMeta[cue.slide] || {};
         var body = bodyMap[cue.slide] || {};
         var kind = safeKind(sm.kind);
-        slideEl.className = "kind-" + kind;
+        var imgUrl = slideImageUrl(sm.image);
+        // 画像が既に読み込み済みなら、テキスト面を描く前に has-img を付けておく
+        // (className を組み立てる時点で決めるため、1フレームも露出しない)
+        var cached = imgUrl ? imgCache[imgUrl] : null;
+        var readyNow = !!(cached && cached.complete && cached.naturalWidth > 0);
+        slideEl.className = "kind-" + kind + (readyNow ? " has-img" : "");
         // 切替アニメーション(クラスを外して再付与し、リフローで再始動)
         void slideEl.offsetWidth;
         slideEl.classList.add("flip");
@@ -1760,18 +1771,28 @@
 
         // 画像スライド: テキスト面の上に全面表示。意味層(alt/本文)は読み上げ・
         // 検索・画像ロード失敗時のフォールバックとして機能する
-        var imgUrl = slideImageUrl(sm.image);
         if (imgUrl) {
           var img = document.createElement("img");
           img.className = "slide-img";
           img.alt = (typeof body.alt === "string" && body.alt) || body.title || cue.slide;
-          img.addEventListener("load", function () { slideEl.classList.add("has-img"); });
-          // ロード失敗時はテキスト面がそのまま見える(has-imgを付けない)
-          img.addEventListener("error", function () { img.remove(); });
+          if (!readyNow) {
+            // 未読込のときだけ load を待つ(この間はテキスト面が見えるが、
+            // 先読みが効いていれば通常ここへは来ない)
+            img.addEventListener("load", function () { slideEl.classList.add("has-img"); });
+          }
+          // ロード失敗時はテキスト面がそのまま見える(has-imgを外す)
+          img.addEventListener("error", function () {
+            img.remove();
+            slideEl.classList.remove("has-img");
+          });
           img.src = imgUrl;
+          if (!imgCache[imgUrl]) imgCache[imgUrl] = img;
           slideEl.appendChild(img);
         }
+        // 前後2枚を先読みしておく(逆再生・シークでもチラつかせない)
         prefetchSlideImage(i + 1);
+        prefetchSlideImage(i + 2);
+        prefetchSlideImage(i - 1);
         document.getElementById("mSlide").textContent = String(i + 1);
         // フィルムストリップの状態更新
         var thumbs = document.querySelectorAll("#strip .thumb");
@@ -2002,6 +2023,12 @@
         b.addEventListener("click", function () { seekTo(i); });
         strip.appendChild(b);
       });
+
+      // 画像スライドのブックは全枚を裏で先読みしておく(切替のチラつきを完全に無くす。
+      // 画像は1枚あたり数十〜数百KBで、シーク主体の使い方でも待たされないことを優先する)
+      if (cues.some(function (c) { return (slideMeta[c.slide] || {}).image; })) {
+        cues.forEach(function (_c, i) { prefetchSlideImage(i); });
+      }
 
       cur = 0;
       render(0);
