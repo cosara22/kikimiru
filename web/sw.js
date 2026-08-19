@@ -13,7 +13,9 @@
  */
 "use strict";
 
-const CACHE_VERSION = "kikimiru-v1";
+// UI(player.html)やシェル部品を更新したら必ずこの版数を上げる。
+// activate で旧世代のキャッシュを削除するため、端末側の古いシェルが確実に入れ替わる。
+const CACHE_VERSION = "kikimiru-v2";
 const SHELL = [
   "/web/player.html",
   "/web/manifest.webmanifest",
@@ -25,6 +27,9 @@ const SHELL = [
 const NETWORK_TIMEOUT_MS = 3000;
 
 self.addEventListener("install", (event) => {
+  // 新しいSWを待機させず即座に有効化する。self-hostの単一ユーザー用途では
+  // 「古いシェルが次回起動まで残る」不便の方が大きい
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(SHELL))
   );

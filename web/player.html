@@ -824,6 +824,14 @@
   // LANのhttp運用ではSWは動かないため静かにスキップ(通常動作に影響なし)
   if ("serviceWorker" in navigator && window.isSecureContext) {
     navigator.serviceWorker.register("/web/sw.js", { scope: "/web/" }).catch(function () {});
+    // 新しいSWが有効化されたら1度だけ自動リロードして最新UIへ入れ替える
+    // (PWAとしてインストールした端末で古いシェルが残り続けるのを防ぐ)
+    var swReloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (swReloaded) return;
+      swReloaded = true;
+      location.reload();
+    });
   }
   var offlineNotified = false;
 
