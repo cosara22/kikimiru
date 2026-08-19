@@ -389,6 +389,10 @@
     background: var(--sep-2); }
   .drag-handle:active { cursor: grabbing; }
   #playerOverlay .stage { flex: 1; min-height: 0; }
+  /* オーバーレイ内の描画先。ハンドル分を差し引いて画面内に収める */
+  #playerHost { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #playerHost .stage { min-height: 0; }
+  #playerHost .playerpane { min-height: 0; }
 
   /* ================= プレイヤー(没入) ================= */
   .glow { position: fixed; inset: 0; pointer-events: none;
@@ -448,13 +452,16 @@
   body.immersive { overflow: hidden; }
   body.immersive .stage { padding: 0; max-width: none; gap: 0; }
   body.immersive .playerpane { padding: 0; min-height: 100dvh; position: relative; }
-  body.immersive #slide {
-    position: fixed; inset: 0; z-index: 5; border-radius: 0; border: none;
-    box-shadow: none; min-height: 0; padding: 6vh 8vw;
-    /* 画面全体を占める。16:9より縦長の画面では上下中央に置く(aspect-ratioを解除) */
-    aspect-ratio: auto; width: auto; height: auto;
+  /* 全画面オーバーレイ型の没入は「横長の画面」でのみ使う。
+     縦長(モバイル縦持ち)は下の @media で YouTube Music 型の縦積みにする */
+  @media (min-aspect-ratio: 1/1), (min-width: 761px) {
+    body.immersive #slide {
+      position: fixed; inset: 0; z-index: 5; border-radius: 0; border: none;
+      box-shadow: none; min-height: 0; padding: 6vh 8vw;
+      aspect-ratio: auto; width: auto; height: auto;
+    }
+    body.immersive #slide.has-img { padding: 0; }
   }
-  body.immersive #slide.has-img { padding: 0; }
   /* 没入時はテキストスライドも画面サイズに合わせて拡大する */
   body.immersive #slide h2 { font-size: clamp(27px, 4.2vw, 64px); }
   body.immersive #slide li { font-size: clamp(16.5px, 2.1vw, 32px); }
@@ -463,7 +470,8 @@
   body.immersive #slide ul, body.immersive #slide .note { max-width: 62vw; }
   body.immersive #slide.kind-title h2 { font-size: clamp(31px, 5vw, 76px); }
 
-  /* オーバーレイ化する部品(上=chrome / 下=操作+一覧) */
+  /* ---- 以下は横長画面(デスクトップ/モバイル横持ち)専用のオーバーレイ型 ---- */
+  @media (min-aspect-ratio: 1/1), (min-width: 761px) {
   body.immersive .chrome {
     position: fixed; top: 0; left: 0; right: 0; z-index: 12; height: auto;
     padding: 8px 16px 10px;
@@ -517,6 +525,7 @@
   body.immersive.ui-hidden .chrome,
   body.immersive.ui-hidden .ovl-bottom { opacity: 0; pointer-events: none; }
   body.immersive .chrome, body.immersive .ovl-bottom { transition: opacity .25s linear; }
+  }  /* end: 横長画面専用 */
   body.immersive.ui-hidden { cursor: none; }
   /* 没入トグルボタン */
   .zoom-btn { width: 38px; height: 38px; border-radius: 50%; color: var(--ink2);
@@ -533,13 +542,52 @@
      (chromeの下)に置き、余った下側を操作UIとスライド一覧に使う。
      さらに拡大したいときは端末を横向きにすると全画面になる */
   @media (orientation: portrait) and (max-width: 760px) {
+    /* ---- 縦画面は YouTube Music の Now Playing 構造(縦積み)にする ----
+       上から: ヘッダ → スライド(16:9・幅いっぱい) → タイトル → 本文(要点) →
+       シークバー → 大きな操作列 → 目次。fixed配置をやめて自然に積む */
+    /* オーバーレイ内はハンドル(22px)分を差し引く。直リンク時は画面高いっぱい。
+       .stage は既定で横並び(flex-direction: row)のため、縦画面では縦並びに戻す
+       — さもないとスライドが横に引き伸ばされ、16:9で高さが画面外まで膨張する */
+    body.immersive .stage { flex-direction: column; width: 100%; }
+    body.immersive .playerpane { display: flex; flex-direction: column;
+      height: 100dvh; width: 100%; }
+    body.player-open.immersive .playerpane { height: calc(100dvh - 22px); }
+    body.immersive .chrome { position: static; background: none; border: none;
+      padding: 6px 12px; flex-shrink: 0; }
     body.immersive #slide,
     body.immersive:not(.ui-hidden) #slide {
-      /* chromeの下から始める。重ならないよう実測値+余白 */
-      inset: auto 0 auto 0; top: 96px; bottom: auto; height: auto; aspect-ratio: 16 / 9;
+      position: relative; inset: auto; top: auto; bottom: auto;
+      width: 100%; height: auto; aspect-ratio: 16 / 9; flex-shrink: 0;
+      border-radius: 0; margin: 0; padding: 0; overflow: hidden;
+      border: none; box-shadow: none;
     }
-    /* 縦画面では再開バーを画面幅いっぱいのchrome直下に置く */
-    body.immersive #resume { top: 56px; left: 3vw; right: 3vw; max-width: none; }
+    /* 再開バーは絶対配置をやめ、chromeの直下に積む */
+    body.immersive #resume { position: static; margin: 0 12px 8px;
+      max-width: none; left: auto; right: auto; top: auto; }
+    /* スライドの下に本文(見出し・要点)を出す。空白を情報で埋める */
+    .np-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 4px; }
+    .np-body .np-title { font-size: 19px; font-weight: 700; line-height: 1.4;
+      color: var(--ink); }
+    .np-body .np-sub { font-size: 12.5px; color: var(--ink3); margin-top: 4px; }
+    .np-body ul { list-style: none; margin-top: 12px; display: flex;
+      flex-direction: column; gap: 9px; }
+    .np-body li { font-size: 14.5px; line-height: 1.6; color: var(--ink2);
+      padding-left: 1.1em; text-indent: -1.1em; }
+    .np-body li::before { content: "— "; color: var(--tint); }
+    body:not(.immersive) .np-body { display: none; }
+    /* 操作列は下部に固定。YTM同様に大きく */
+    body.immersive .ovl-bottom { position: static; padding: 0 16px
+      calc(env(safe-area-inset-bottom) + 10px); background: none; border: none;
+      flex-shrink: 0; }
+    body.immersive .ovl-bottom .transport { gap: 20px; margin: 4px 0 6px; }
+    body.immersive .ovl-bottom .play-main { width: 66px; height: 66px; }
+    body.immersive .ovl-bottom .play-main svg { width: 28px; height: 28px; }
+    body.immersive .ovl-bottom .tbtn { width: 48px; height: 48px; }
+    body.immersive #resume { position: static; margin: 0 12px 6px; }
+    /* 縦画面では自動で隠さない(積み構造なので隠しても得がない) */
+    body.immersive.ui-hidden .chrome,
+    body.immersive.ui-hidden .ovl-bottom,
+    body.immersive.ui-hidden .np-body { opacity: 1; pointer-events: auto; }
     body.immersive .ovl-bottom { background: var(--overlay-bg); }
     /* 縦画面では操作UIを自動で隠さない(隠しても余白が空くだけで得がない) */
     body.immersive.ui-hidden .chrome,
@@ -1984,6 +2032,7 @@
       '</div>' +
       '<div id="resume"><span>前回の続き <b id="resumeAt"></b> から再開します</span><button id="resumeOff" type="button" aria-label="最初から再生">×</button></div>' +
       '<section id="slide" aria-live="polite"></section>' +
+      '<div class="np-body" id="npBody" aria-live="polite"></div>' +
       '<div class="ovl-bottom">' +
       '<div class="counter">スライド <b id="mSlide">–</b> / <span id="mTotal">–</span></div>' +
       '<div class="scrubber" aria-label="シークバー"><div class="scrub-track" id="track">' +
@@ -2239,6 +2288,25 @@
           if (!imgCache[imgUrl]) imgCache[imgUrl] = img;
           slideEl.appendChild(img);
         }
+        // 縦画面(YTM構造)ではスライドの下に本文を出す。画像スライドでも
+        // 意味層(alt/bullets)があるので、小さい画面でも内容が読める
+        var np = document.getElementById("npBody");
+        if (np) {
+          np.textContent = "";
+          np.appendChild(el("div", "np-title", body.title || cue.slide));
+          np.appendChild(el("div", "np-sub", kindLabel + " · " + (i + 1) + " / " + cues.length));
+          if (body.bullets && body.bullets.length) {
+            var npul = document.createElement("ul");
+            body.bullets.forEach(function (bl) {
+              npul.appendChild(el("li", null, bl));
+            });
+            np.appendChild(npul);
+          } else if (typeof body.alt === "string" && body.alt) {
+            np.appendChild(el("p", "np-alt", body.alt));
+          }
+          if (body.note) np.appendChild(el("div", "note", body.note));
+        }
+
         // 前後2枚を先読みしておく(逆再生・シークでもチラつかせない)
         prefetchSlideImage(i + 1);
         prefetchSlideImage(i + 2);
