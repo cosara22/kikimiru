@@ -15,7 +15,9 @@
 import hashlib
 import json
 import os
+import re
 import secrets
+import shutil
 import socket
 import subprocess
 import sys
@@ -49,6 +51,7 @@ class Server:
         self.base = "http://127.0.0.1:%d" % self.port
         self.log = open(os.path.join(self.state_dir, "server.log"), "ab")
         self.proc = None
+        self.app_root = ROOT   # restart_from() で複製アプリへ差し替えられる
         self.start()
 
     def start(self):
@@ -56,9 +59,9 @@ class Server:
             return
         for attempt in (1, 2):
             self.proc = subprocess.Popen(
-                [sys.executable, os.path.join(ROOT, "server", "kikimiru_server.py"),
+                [sys.executable, os.path.join(self.app_root, "server", "kikimiru_server.py"),
                  "--port", str(self.port), "--state-dir", self.state_dir],
-                stdout=self.log, stderr=subprocess.STDOUT, cwd=ROOT)
+                stdout=self.log, stderr=subprocess.STDOUT, cwd=self.app_root)
             deadline = time.time() + 20
             while time.time() < deadline:
                 try:
@@ -94,12 +97,39 @@ class Server:
         self.proc = None
         time.sleep(0.3)
 
+    def restart_from(self, app_root):
+        """別のアプリルート(server/+web/+demo/ の複製)から同一ポート・同一state-dirで
+        起動し直す。同一オリジンのままシェル(sw.js等)だけ差し替わるため、
+        Service Worker更新経路の検証に使う。"""
+        self.stop()
+        self.app_root = app_root
+        self.start()
+
     def close(self):
         self.stop()
         try:
             self.log.close()
         except Exception:
             pass
+
+
+def make_app_copy(version_suffix):
+    """server/+web/+demo/ を一時ディレクトリへ複製し、複製側 sw.js の CACHE_VERSION に
+    接尾辞を付けて「シェル更新後のアプリ」を作る。(複製ルート, 新版数) を返す。"""
+    dst = tempfile.mkdtemp(prefix="kikimiru-e2e-app-")
+    for d in ("server", "web", "demo"):
+        shutil.copytree(os.path.join(ROOT, d), os.path.join(dst, d))
+    swp = os.path.join(dst, "web", "sw.js")
+    with open(swp, encoding="utf-8") as f:
+        src = f.read()
+    m = re.search(r'const CACHE_VERSION = "([^"]+)"', src)
+    if not m:
+        raise RuntimeError("sw.js の CACHE_VERSION が見つかりません")
+    new_ver = m.group(1) + version_suffix
+    src = src.replace(m.group(0), 'const CACHE_VERSION = "%s"' % new_ver, 1)
+    with open(swp, "w", encoding="utf-8") as f:
+        f.write(src)
+    return dst, new_ver
 
 
 # navigator.onLine の決定論的な模擬。localStorageフラグ方式にすることで、
@@ -119,6 +149,14 @@ _FORCE_OFFLINE_INIT = """(() => {
 def mobile_context(browser, **kw):
     ctx = browser.new_context(viewport={"width": 390, "height": 844},
                               has_touch=True, is_mobile=True,
+                              color_scheme="dark", **kw)
+    ctx.add_init_script(_FORCE_OFFLINE_INIT)
+    return ctx
+
+
+def desktop_context(browser, **kw):
+    """マウス+広幅(シアターレイアウト・キーボード操作の検証用)。"""
+    ctx = browser.new_context(viewport={"width": 1440, "height": 900},
                               color_scheme="dark", **kw)
     ctx.add_init_script(_FORCE_OFFLINE_INIT)
     return ctx
