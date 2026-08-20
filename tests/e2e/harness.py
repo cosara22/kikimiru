@@ -143,6 +143,19 @@ def wait_sw(page):
     page.wait_for_function("() => !!navigator.serviceWorker.controller", timeout=20000)
 
 
+def wait_api_cached(page):
+    """オフライン遷移の前提となるAPIスナップショットがSWキャッシュに載るまで待つ。
+
+    SWの cache.put は応答返却後の非同期処理のため、応答直後にサーバを止めると
+    スナップショットが欠けたままになり、オフライン画面(起動の /api/libraries、
+    詳細フォールバックの /api/books)が組み立てられないことがある(実測フレーク)。
+    """
+    page.wait_for_function(
+        "async () => !!(await caches.match('/api/libraries'))"
+        " && !!(await caches.match('/api/books'))",
+        timeout=15000)
+
+
 def save_book(page, base, book_id):
     """ブック詳細から「オフライン保存」して完了(保存を削除の表示)まで待つ。"""
     page.goto(base + "/web/player.html?view=book&book=" + book_id,

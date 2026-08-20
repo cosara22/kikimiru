@@ -50,6 +50,7 @@ class OfflineCoreTest(unittest.TestCase):
         self.assertEqual(n, 9, "音声+deck+content+表紙+スライド5の一式")
 
         # 真のオフライン: 206合成しかあり得ない状態で検証する
+        harness.wait_api_cached(page)   # 停止前にAPIスナップショットの搭載を確定させる
         self.server.stop()
         rng = page.evaluate("""async () => {
           const u = '/books/demo/%s/audio.mp3';
@@ -77,23 +78,23 @@ class OfflineCoreTest(unittest.TestCase):
         self.ctx.set_offline(True)
         page.goto(self.server.base + "/web/player.html?book=" + BOOK,
                   wait_until="domcontentloaded")
+        # src は一旦HTTP URLが入り、キャッシュ照合後に非同期でblobへ差し替わる。
+        # 「srcが真」ではなく「blob:になった」ことを条件として待つ(速度差でのフレーク対策)
         page.wait_for_function(
-            "() => { const a = document.getElementById('audio'); return a && a.src; }",
+            "() => { const a = document.getElementById('audio');"
+            " return a && a.src.indexOf('blob:') === 0; }",
             timeout=20000)
-        self.assertTrue(page.evaluate(
-            "() => document.getElementById('audio').src.startsWith('blob:')"))
         page.evaluate("() => document.getElementById('audio').play()")
-        page.wait_for_timeout(1500)
-        st = page.evaluate("""() => {
-          const a = document.getElementById('audio');
-          return { playing: !a.paused, t: a.currentTime, dur: a.duration || 0 };
-        }""")
-        self.assertTrue(st["playing"] and st["t"] > 0.3, st)
-        self.assertGreater(st["dur"], 30)
+        page.wait_for_function(
+            "() => { const a = document.getElementById('audio');"
+            " return !a.paused && a.currentTime > 0.3; }",
+            timeout=15000)
+        self.assertGreater(page.evaluate(
+            "() => document.getElementById('audio').duration || 0"), 30)
         page.evaluate("() => { document.getElementById('audio').currentTime = 20; }")
-        page.wait_for_timeout(1000)
-        self.assertGreaterEqual(
-            page.evaluate("() => document.getElementById('audio').currentTime"), 19.5)
+        page.wait_for_function(
+            "() => document.getElementById('audio').currentTime >= 19.5",
+            timeout=10000)
         page.evaluate("() => document.getElementById('audio').pause()")
 
         # 合成断片がサーバ応答とバイト単位で一致する
@@ -108,12 +109,15 @@ class OfflineCoreTest(unittest.TestCase):
 
     def test_unsaved_book_shows_clear_error_offline(self):
         page = self.page
+        harness.wait_api_cached(page)   # 停止前にAPIスナップショットの搭載を確定させる
         self.server.stop()
         page.goto(self.server.base + "/web/player.html?book=demo-guide-2",
                   wait_until="domcontentloaded")
-        page.wait_for_timeout(4500)   # /api系のnetwork-firstタイムアウト(3秒)を跨ぐ
-        warn = page.evaluate("() => document.getElementById('warn').textContent")
-        self.assertIn("ブックを読み込めませんでした", warn)
+        # /api系のnetwork-firstタイムアウト(3秒)後に表示される。時間ではなく表示を待つ
+        page.wait_for_function(
+            "() => document.getElementById('warn').textContent"
+            ".includes('ブックを読み込めませんでした')",
+            timeout=20000)
 
     def test_delete_flow(self):
         page = self.page

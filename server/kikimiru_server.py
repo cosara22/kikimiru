@@ -602,12 +602,13 @@ class Library:
 
 
 class KikimiruServer(ThreadingHTTPServer):
-    # ThreadingHTTPServer既定の allow_reuse_address=1 はUnixでは無害だが、
-    # WindowsではSO_REUSEADDRの意味が異なり、同一ポートへ別プロセスが
-    # 後乗りできてしまう(乗っ取りの余地がある)ため明示的に無効化する。
+    # SO_REUSEADDR の意味はOSで異なるため、OS別に切り替える:
+    # - Windows: 同一ポートへ別プロセスが後乗りできてしまう(乗っ取りの余地)ため無効化
+    # - Unix系: 後乗りは許さず TIME_WAIT 中の再bindだけを許す標準動作。無効にすると
+    #   サーバ再起動が最大60秒 EADDRINUSE で失敗する(Linuxで実測)
     # インスタンス属性ではなくクラス属性で設定する必要がある
     # (server_bind() は __init__ 内、コンストラクタ完了前に実行されるため)。
-    allow_reuse_address = False
+    allow_reuse_address = (sys.platform != "win32")
 
 
 class KikimiruHandler(BaseHTTPRequestHandler):

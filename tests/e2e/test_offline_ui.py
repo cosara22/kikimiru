@@ -127,27 +127,27 @@ class OfflineUiTest(unittest.TestCase):
         # オフライン時の詳細画面はこのスナップショットから組み立てられる
         page.goto(self.server.base + "/web/player.html?view=home",
                   wait_until="networkidle")
-        page.wait_for_timeout(800)
+        harness.wait_api_cached(page)   # cache.put完了前に止めると欠ける(非同期put対策)
         self.server.stop()
         self.ctx.set_offline(True)   # navigator.onLine=false(バッジ・ガードの条件)
         page.goto(self.server.base + "/web/player.html?view=home",
                   wait_until="domcontentloaded")
-        page.wait_for_timeout(4000)
-        self.assertTrue(page.evaluate(
-            "() => getComputedStyle(document.getElementById('netBadge')).display !== 'none'"))
+        # バッジ表示は時間ではなく状態として待つ(遅い環境でのフレーク対策)
+        page.wait_for_function(
+            "() => { const b = document.getElementById('netBadge');"
+            " return b && getComputedStyle(b).display !== 'none'; }",
+            timeout=20000)
         # 未保存ブック: 入口ガードでオーバーレイを開かず理由を表示する
         page.goto(self.server.base + "/web/player.html?view=book&book=demo-guide-2",
                   wait_until="domcontentloaded")
-        page.wait_for_timeout(4000)
+        page.wait_for_selector(".cta", timeout=20000)
         page.click(".cta")
-        page.wait_for_timeout(800)
-        st = page.evaluate("""() => ({
-          overlayOpen: document.body.classList.contains('player-open'),
-          warned: document.getElementById('warn').textContent
-            .includes('保存されていないため再生できません'),
-        })""")
-        self.assertFalse(st["overlayOpen"])
-        self.assertTrue(st["warned"])
+        page.wait_for_function(
+            "() => document.getElementById('warn').textContent"
+            ".includes('保存されていないため再生できません')",
+            timeout=10000)
+        self.assertFalse(page.evaluate(
+            "() => document.body.classList.contains('player-open')"))
         self.ctx.set_offline(False)
 
 
