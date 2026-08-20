@@ -33,13 +33,14 @@ Mac mini 側でデモサーバを起動する(Python 3.9+、依存なし):
 
 ```
 cd kikimiru
-python3 server/kikimiru_server.py
+python3 server/kikimiru_server.py --set-password   # 初回のみ: パスワードを対話設定
+python3 server/kikimiru_server.py                  # 起動(既定ポート 8484)
 ```
 
-- シミュレータから: アプリのサーバURLに `http://127.0.0.1:8000`(起動ログのポート)
+- シミュレータから: アプリのサーバURLに `http://127.0.0.1:8484`
 - 実機から: Mac のLAN IPで起動し直す:
   `python3 server/kikimiru_server.py --bind 0.0.0.0 --allow-host 192.168.x.x`
-  アプリのサーバURLに `http://192.168.x.x:8000`
+  アプリのサーバURLに `http://192.168.x.x:8484`
   (`--allow-host` を付けないと 403 になる。DNSリバインディング対策の仕様)
 
 ## G0 受け入れチェックリスト
