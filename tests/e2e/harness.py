@@ -53,19 +53,32 @@ class Server:
     def start(self):
         if self.proc:
             return
-        self.proc = subprocess.Popen(
-            [sys.executable, os.path.join(ROOT, "server", "kikimiru_server.py"),
-             "--port", str(self.port), "--state-dir", self.state_dir],
-            stdout=self.log, stderr=subprocess.STDOUT, cwd=ROOT)
-        deadline = time.time() + 20
-        while time.time() < deadline:
-            try:
-                with urllib.request.urlopen(self.base + "/web/player.html", timeout=1) as r:
-                    if r.status == 200:
-                        return
-            except Exception:
-                time.sleep(0.2)
-        raise RuntimeError("サーバが起動しませんでした: " + self.base)
+        for attempt in (1, 2):
+            self.proc = subprocess.Popen(
+                [sys.executable, os.path.join(ROOT, "server", "kikimiru_server.py"),
+                 "--port", str(self.port), "--state-dir", self.state_dir],
+                stdout=self.log, stderr=subprocess.STDOUT, cwd=ROOT)
+            deadline = time.time() + 20
+            while time.time() < deadline:
+                try:
+                    with urllib.request.urlopen(self.base + "/web/player.html",
+                                                timeout=1) as r:
+                        if r.status == 200:
+                            return
+                except Exception:
+                    time.sleep(0.2)
+            # 立ち上がらなかった: 一度だけ作り直す(ポートのTIME_WAIT等の一過性対策)
+            self.stop()
+        raise RuntimeError("サーバが起動しませんでした: %s\n---- server.log 末尾 ----\n%s"
+                           % (self.base, self._tail_log()))
+
+    def _tail_log(self):
+        try:
+            self.log.flush()
+            with open(self.log.name, "rb") as f:
+                return f.read()[-2000:].decode("utf-8", "replace")
+        except Exception:
+            return "(ログを読めませんでした)"
 
     def stop(self):
         """真のオフラインを作る(接続拒否になる)。"""
@@ -95,15 +108,34 @@ def mobile_context(browser, **kw):
 
 
 def login(page, base):
+    """ログインして本棚UIが出るまで待つ。
+
+    アプリはSWの初回claim時に1度だけ自動リロードする。遅い環境では
+    「パスワード入力→リロードで消える→空送信」の競合が起きるため、
+    先にSWの制御確立(=リロード)を待ってから入力し、成功をUIで検証して
+    ダメなら再試行する。
+    """
     page.goto(base + "/web/player.html", wait_until="domcontentloaded")
     try:
-        page.wait_for_selector("#login input", timeout=5000)
+        page.wait_for_function("() => !!navigator.serviceWorker.controller",
+                               timeout=20000)
     except Exception:
-        return  # 既にセッションあり
-    page.fill("#login input", PASSWORD)
-    page.click("#login button")
-    page.wait_for_load_state("networkidle")
-    page.wait_for_timeout(600)
+        pass  # SWが使えない環境でもログイン自体は成立する
+    page.wait_for_timeout(600)   # claim直後の自動リロードを跨ぐ
+    for _ in range(3):
+        try:
+            page.wait_for_selector("#login input", timeout=4000)
+        except Exception:
+            return  # ログイン画面が無い=既にセッションあり
+        page.fill("#login input", PASSWORD)
+        page.click("#login button")
+        try:
+            # 成功すると location.reload() され、本棚UI(タブバー)が出る
+            page.wait_for_selector("#tabbar a", timeout=8000)
+            return
+        except Exception:
+            page.wait_for_timeout(500)   # リロード競合等はやり直す
+    raise RuntimeError("ログインできませんでした")
 
 
 def wait_sw(page):
