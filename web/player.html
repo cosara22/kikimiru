@@ -209,6 +209,11 @@
     border-radius: 50%; background: var(--tint); color: var(--on-tint);
     display: flex; align-items: center; justify-content: center; }
   .done-badge svg { width: 12px; height: 12px; }
+  /* オフライン保存済みバッジ(カバー左下。右上=聴了・左上=巻数・下端=進捗と重ねない) */
+  .dl-badge { position: absolute; left: 8px; bottom: 10px; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--scrim); color: #fff;
+    display: flex; align-items: center; justify-content: center; }
+  .dl-badge svg { width: 12px; height: 12px; }
   .seq-badge { position: absolute; left: 8px; top: 8px; font-size: 11px; font-weight: 700;
     background: var(--scrim); color: var(--ink); border-radius: 6px; padding: 3px 7px; }
 
@@ -322,8 +327,8 @@
     transition: background-color .12s linear; }
   .cta:hover { background: var(--tint-hi); }
   .cta svg { width: 16px; height: 16px; }
-  .sub-actions { display: flex; gap: 10px; margin-bottom: 18px; }
-  .sub-actions .sab { flex: 1; font-size: 12.5px; font-weight: 600; color: var(--ink2);
+  .sub-actions { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .sub-actions .sab { flex: 1 1 40%; font-size: 12.5px; font-weight: 600; color: var(--ink2);
     border: 1px solid var(--veil-3); border-radius: 10px; padding: 9px 0;
     text-align: center; transition: color .12s linear, border-color .12s linear; }
   .sub-actions .sab:hover { color: var(--ink); border-color: var(--sep-2); }
@@ -1125,6 +1130,126 @@
     return "/books/" + encodeURIComponent(lib) + "/" + encodeURIComponent(id) + "/";
   }
 
+  // ================= ブック単位オフライン保存 =================
+  // 保存エンジンは Cache Storage(名前空間 kikimiru-book-*)。200完全体のみを置き、
+  // オフライン再生時の206はService Workerがその場で合成する(web/sw.js)。
+  var BOOK_CACHE_PREFIX = "kikimiru-book-";
+  function bookCacheName(lib, id) { return BOOK_CACHE_PREFIX + lib + "/" + id; }
+  function offlineCapable() {
+    // Cache Storage と SW が使える環境のみ(平文HTTPのLAN運用ではSWが動かない)
+    return "caches" in window && "serviceWorker" in navigator && window.isSecureContext;
+  }
+  function isBookDownloaded(lib, id) {
+    if (!offlineCapable()) return Promise.resolve(false);
+    return caches.has(bookCacheName(lib, id)).catch(function () { return false; });
+  }
+  function deleteBookDownload(lib, id) {
+    return caches.delete(bookCacheName(lib, id)).then(function (ok) {
+      try { localStorage.removeItem("kikimiru.dl." + lib + "/" + id); } catch (e) {}
+      return ok;
+    });
+  }
+  // 音声を進捗つきで取得する。途中で切れたら Range: bytes=N- で続きから再開する
+  // (サーバは常に Content-Length を返すため確定的な%表示ができる)
+  function fetchAudioResumable(url, onProgress) {
+    var chunks = [], got = 0, total = 0, type = "";
+    function attempt(retries) {
+      var opts = got > 0 ? { headers: { "Range": "bytes=" + got + "-" } } : {};
+      return fetch(url, opts).then(function (r) {
+        if (r.status !== 200 && r.status !== 206) throw new Error("audio " + r.status);
+        if (r.status === 200 && got > 0) { chunks = []; got = 0; }
+        if (!total) {
+          if (r.status === 206) {
+            var cr = /\/(\d+)$/.exec(r.headers.get("Content-Range") || "");
+            total = cr ? parseInt(cr[1], 10) : 0;
+          } else {
+            total = parseInt(r.headers.get("Content-Length") || "0", 10);
+          }
+        }
+        if (!type) type = r.headers.get("Content-Type") || "";
+        if (!r.body || !r.body.getReader) {
+          return r.blob().then(function (b) {
+            chunks.push(b);
+            got += b.size;
+            onProgress(got, total);
+            return new Blob(chunks, { type: type });
+          });
+        }
+        var reader = r.body.getReader();
+        function pump() {
+          return reader.read().then(function (res) {
+            if (res.done) return new Blob(chunks, { type: type });
+            chunks.push(res.value);
+            got += res.value.byteLength;
+            onProgress(got, total);
+            return pump();
+          });
+        }
+        return pump();
+      }).catch(function (e) {
+        // 途中まで取れていればRangeで再開を試みる(最大2回)
+        if (retries > 0 && got > 0) return attempt(retries - 1);
+        throw e;
+      });
+    }
+    return attempt(2);
+  }
+  // ブック一式(音声+deck+content+表紙+画像スライド)を保存する。
+  // 失敗時は中途半端なキャッシュを残さない(全削除してから投げ直す)
+  function downloadBook(book, onProgress) {
+    var lib = book.library, id = book.id;
+    var base = bookBase(lib, id);
+    var cname = bookCacheName(lib, id);
+    var audioBytes = 0;
+    return caches.open(cname).then(function (cache) {
+      return fetch(base + "deck.json").then(function (r) {
+        if (!r.ok) throw new Error("deck.json " + r.status);
+        return r.clone().json().then(function (deck) {
+          return cache.put(base + "deck.json", r).then(function () { return deck; });
+        });
+      }).then(function (deck) {
+        // 付随ファイル(無いものは静かにスキップ)
+        var extras = ["content.json"];
+        if (book.cover) extras.push(encodeURIComponent(book.cover));
+        (deck.slides || []).forEach(function (s) {
+          if (s && typeof s.image === "string" && s.image &&
+              !/\\|\.\.|[?#]/.test(s.image) && s.image.split("/").length <= 2) {
+            extras.push(s.image.split("/").map(encodeURIComponent).join("/"));
+          }
+        });
+        var chain = Promise.resolve();
+        extras.forEach(function (name) {
+          chain = chain.then(function () {
+            return fetch(base + name).then(function (r) {
+              if (!r.ok) return null;
+              return cache.put(base + name, r);
+            }).catch(function () { return null; });
+          });
+        });
+        var audioName = (deck.audio && typeof deck.audio.src === "string" && deck.audio.src) || "audio.mp3";
+        if (/[\/\\]|\.\.|[?#]/.test(audioName)) throw new Error("音声ファイル名が不正です");
+        var audioUrl = base + encodeURIComponent(audioName);
+        return chain.then(function () {
+          return fetchAudioResumable(audioUrl, onProgress);
+        }).then(function (blob) {
+          audioBytes = blob.size;
+          return cache.put(audioUrl, new Response(blob, {
+            status: 200,
+            headers: {
+              "Content-Type": blob.type || "audio/mpeg",
+              "Content-Length": String(blob.size)
+            }
+          }));
+        });
+      });
+    }).then(function () {
+      lsSet("kikimiru.dl." + lib + "/" + id, JSON.stringify({ bytes: audioBytes, at: Date.now() }));
+      return audioBytes;
+    }).catch(function (e) {
+      return caches.delete(cname).then(function () { throw e; });
+    });
+  }
+
   // ================= アイコン(全自作SVG) =================
   var I = {
     home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 11 12 3.8 20.5 11"/><path d="M5.8 9.8V20h12.4V9.8"/><path d="M10 20v-5h4v5"/></svg>',
@@ -1162,7 +1287,8 @@
     collapse: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h5V4"/><path d="M20 15h-5v5"/><path d="M15 4v5h5"/><path d="M9 20v-5H4"/></svg>',
     headph: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 14a7.8 7.8 0 0 1 15.6 0"/><rect x="3.4" y="13.4" width="4" height="6.4" rx="1.8"/><rect x="16.6" y="13.4" width="4" height="6.4" rx="1.8"/></svg>',
     slideTab: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><rect x="3" y="6" width="18" height="12" rx="2.4"/><path d="m10.4 9.5 4.6 2.5-4.6 2.5z" fill="currentColor" stroke="none"/></svg>',
-    timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.6" r="6.8"/><path d="M12 10.6v3.4l2.3 1.5"/><path d="M9.6 3.4h4.8"/><path d="M12 3.4v2.2"/></svg>'
+    timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13.6" r="6.8"/><path d="M12 10.6v3.4l2.3 1.5"/><path d="M9.6 3.4h4.8"/><path d="M12 3.4v2.2"/></svg>',
+    download: '<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1.5v6M3.4 5 6 7.6 8.6 5"/><path d="M2 10.5h8"/></svg>'
   };
 
   // ================= 状態 =================
@@ -1422,6 +1548,16 @@
     }
     if (opts.showSeq && b.series && b.series.sequence) {
       covLink.appendChild(el("span", "seq-badge", "#" + b.series.sequence));
+    }
+    // オフライン保存済みバッジ(非同期確認。カード破棄後は付けない)
+    if (offlineCapable()) {
+      isBookDownloaded(b.library, b.id).then(function (has) {
+        if (!has || !covLink.isConnected) return;
+        var dlb = el("span", "dl-badge");
+        dlb.title = "オフライン保存済み";
+        dlb.innerHTML = I.download;
+        covLink.appendChild(dlb);
+      });
     }
     card.appendChild(covLink);
 
@@ -2113,6 +2249,59 @@
         }).then(function () { exportBtn.disabled = false; });
       });
       subs.appendChild(exportBtn);
+      // オフライン保存(Cache Storageへ一式保存。進捗はボタン自体に表示)
+      if (offlineCapable()) {
+        var dlBtn = el("button", "sab", "オフライン保存");
+        dlBtn.type = "button";
+        dlBtn.dataset.state = "none";
+        var dlArm = null;
+        function paintDl() {
+          isBookDownloaded(b.library, b.id).then(function (has) {
+            if (!dlBtn.isConnected) return;
+            dlBtn.classList.remove("danger-armed");
+            dlBtn.dataset.state = has ? "saved" : "none";
+            dlBtn.textContent = has ? "保存を削除" : "オフライン保存";
+          });
+        }
+        dlBtn.addEventListener("click", function () {
+          if (dlBtn.dataset.state === "busy") return;
+          if (dlBtn.dataset.state === "saved") {
+            // 削除は2段階(1回目で確認・3秒で戻る)
+            if (dlBtn.classList.contains("danger-armed")) {
+              if (dlArm) clearTimeout(dlArm);
+              deleteBookDownload(b.library, b.id).then(paintDl);
+              return;
+            }
+            dlBtn.classList.add("danger-armed");
+            dlBtn.textContent = "本当に削除?";
+            dlArm = setTimeout(paintDl, 3000);
+            return;
+          }
+          dlBtn.dataset.state = "busy";
+          downloadBook(b, function (got, total) {
+            dlBtn.textContent = total > 0
+              ? "保存中… " + Math.min(99, Math.round(got / total * 100)) + "%"
+              : "保存中… " + (got / 1048576).toFixed(1) + "MB";
+          }).then(function () {
+            paintDl();
+            // 非インストール環境には一度だけ、消えやすさを正直に案内する
+            if (!window.matchMedia("(display-mode: standalone)").matches &&
+                lsGet("kikimiru.dlhint") !== "1") {
+              lsSet("kikimiru.dlhint", "1");
+              warn("保存しました。ブラウザのタブ利用では、長期間使わないと保存が消されることがあります。ホーム画面に追加(インストール)すると保たれやすくなります。");
+            }
+          }).catch(function (e) {
+            paintDl();
+            if (e && e.name === "QuotaExceededError") {
+              warn("空き容量が足りないため保存できませんでした。");
+            } else {
+              warn("オフライン保存に失敗しました: " + (e && e.message || e));
+            }
+          });
+        });
+        subs.appendChild(dlBtn);
+        paintDl();
+      }
       box.appendChild(subs);
 
       var group = el("div", "meta-group");
