@@ -2,12 +2,18 @@ import Foundation
 
 enum APIError: LocalizedError {
     case authRequired
+    case throttled(retryAfter: Int?)
     case http(Int)
     case invalidURL
 
     var errorDescription: String? {
         switch self {
         case .authRequired: return "ログインが必要です"
+        case .throttled(let retryAfter):
+            if let s = retryAfter {
+                return "試行回数の上限に達しました。約\(s)秒後に再試行してください"
+            }
+            return "試行回数の上限に達しました。しばらく待って再試行してください"
         case .http(let code): return "サーバエラー (\(code))"
         case .invalidURL: return "URLが不正です"
         }
@@ -60,12 +66,25 @@ struct APIClient {
     // ---- 認証 ----
 
     func login(password: String) async throws {
-        let body = try JSONEncoder().encode(["password": password])
-        do {
-            try await send("POST", "/api/login", body: body)
-        } catch APIError.http(403) {
-            // 総当たり対策のバックオフ中も認証失敗として扱う
+        guard let u = url("/api/login") else { throw APIError.invalidURL }
+        var req = URLRequest(url: u)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONEncoder().encode(["password": password])
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse else { throw APIError.http(0) }
+        switch http.statusCode {
+        case 200..<300:
+            return
+        case 401, 403:
             throw APIError.authRequired
+        case 429:
+            // 総当たり対策のロックアウト。retry_after秒をUIに出せるよう取り出す
+            struct ThrottleBody: Decodable { let retry_after: Int? }
+            let wait = (try? JSONDecoder().decode(ThrottleBody.self, from: data))?.retry_after
+            throw APIError.throttled(retryAfter: wait)
+        default:
+            throw APIError.http(http.statusCode)
         }
     }
 

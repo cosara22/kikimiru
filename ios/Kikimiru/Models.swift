@@ -30,7 +30,8 @@ struct Book: Codable, Identifiable, Hashable {
 
     struct SeriesRef: Codable, Hashable {
         let name: String?
-        let index: Double?
+        // サーバは巻数を文字列(または null)で返す("2" のほか "上" 等もあり得る)
+        let sequence: String?
     }
 }
 

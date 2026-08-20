@@ -72,7 +72,7 @@ final class AppState: ObservableObject {
             lastError = nil
             phase = .shelf
         } catch APIError.authRequired {
-            lastError = "パスワードが違うか、試行制限中です"
+            lastError = "パスワードが違います"
         } catch {
             lastError = error.localizedDescription
         }
