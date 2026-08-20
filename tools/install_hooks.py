@@ -7,6 +7,10 @@
 - 既存の pre-push フックがある場合は上書きせず、警告して中断する
 - フック本文は `python3` を優先探索する(macOS/LinuxにはPATHへ`python`が無いことが多く、
   決め打ちだと push が常に失敗していた)
+- フックは `--require-config` を付けて呼ぶ。禁止語設定はリポジトリ外にあるため、
+  設定を見失ったまま「禁止語0件で全部合格」となる事故を防ぐ(fail-closed)。
+  禁止語を持たない場合は `python tools/gen_gate_hashes.py --init-empty` で
+  空の設定を明示的に作ってからインストールすること
 
 限界: `git push --no-verify` でこのフックは無効化できる。CI(.github/workflows/release-gate.yml)
 にも同じゲートを置いてあるのは、このローカルフック回避への対策。
@@ -33,7 +37,7 @@ else
   echo "release_gate: python3/python が見つからないため検査をスキップできません" >&2
   exit 1
 fi
-"$PY" tools/release_gate.py
+"$PY" tools/release_gate.py --require-config
 """
 
 
@@ -45,7 +49,13 @@ def main() -> None:
     if hook.exists():
         existing = hook.read_text(encoding="utf-8", errors="replace")
         if "kikimiru release_gate" in existing:
-            print(f"既にインストール済みです: {hook}")
+            # 自分が生成したフックは中身を最新へ更新する。ここで「既にある」と
+            # 何もせずに戻ると、フック本文を直しても既存の環境へ永久に反映されない
+            if existing == HOOK_BODY:
+                print(f"既にインストール済みです(最新): {hook}")
+                return
+            hook.write_text(HOOK_BODY, encoding="utf-8", newline="\n")
+            print(f"更新しました: {hook}")
             return
         print(f"エラー: 既存の pre-push フックがあります({hook})。")
         print("上書きすると既存の内容が失われるため、中断します。")

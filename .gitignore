@@ -5,6 +5,11 @@
 /reviews/
 /scratchpad/
 
+# 禁止語設定はリポジトリの外(KIKIMIRU_GATE_CONFIG / OS既定のユーザ設定ディレクトリ)に置く。
+# ハッシュ化しても、正規化関数が公開されている以上「当てた語をタダで照合できる」
+# オラクルになるため、公開物に含めてはならない。誤って戻された場合の保険として除外する
+release_gate_config.json
+
 __pycache__/
 *.pyc
 .DS_Store

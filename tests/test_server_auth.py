@@ -85,7 +85,9 @@ class TestLoginThrottle(unittest.TestCase):
 class TestProgressMerge(unittest.TestCase):
     def test_valid_key(self):
         self.assertTrue(ks.valid_progress_key("demo/demo-book"))
-        self.assertTrue(ks.valid_progress_key("技術書/ドメイン駆動設計"))
+        # 日本語のライブラリ名・ブックIDが通ること。長音符「ー」は
+        # docs/SCHEMA.md の通りホワイトリスト方式で弾かれやすいので必ず含める
+        self.assertTrue(ks.valid_progress_key("日本語ライブラリ/長音符ーを含む書名"))
         self.assertFalse(ks.valid_progress_key("demo"))
         self.assertFalse(ks.valid_progress_key("demo/a/b"))
         self.assertFalse(ks.valid_progress_key("../etc/passwd"))

@@ -18,8 +18,22 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      # 禁止語設定はリポジトリに置かない(ハッシュと長さの公開は照合オラクルになるため)。
+      # メンテナのpushでは secrets から一時ファイルへ注入し fail-closed で回す。
+      # fork からのPRでは secrets が渡らないため、禁止語照合なしで残りの検査だけ行う。
       - name: release_gate
-        run: python tools/release_gate.py
+        env:
+          GATE_CONFIG: ${{ secrets.KIKIMIRU_GATE_CONFIG }}
+        run: |
+          if [ -n "$GATE_CONFIG" ]; then
+            mkdir -p "$RUNNER_TEMP/kikimiru"
+            printf '%s' "$GATE_CONFIG" > "$RUNNER_TEMP/kikimiru/release_gate_config.json"
+            KIKIMIRU_GATE_CONFIG="$RUNNER_TEMP/kikimiru/release_gate_config.json" \
+              python tools/release_gate.py --require-config
+          else
+            echo "::warning::禁止語設定(secrets.KIKIMIRU_GATE_CONFIG)が無いため、禁止語照合を省略して実行します"
+            python tools/release_gate.py
+          fi
       - name: validate demo decks (全冊)
         run: |
           for d in demo/library/*/; do
