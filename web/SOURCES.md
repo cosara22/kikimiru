@@ -8,7 +8,7 @@
 
 | ファイル | 内容 | マークの倍率 |
 |---|---|---|
-| logo.svg | **意匠の正典**(48x48・配信しない設計ソース)。README・OG用 | — |
+| logo.svg | **意匠の正典**(48x48・配信しない設計ソース)。印刷・外部提出用 | — |
 | icon-192.png / icon-512.png | PWAアイコン(通常) | 1.00 |
 | icon-maskable-512.png | PWAアイコン(maskable) | 0.95 |
 | apple-touch-icon.png | iOSホーム画面用(180px・非透過) | 0.95 |
@@ -43,6 +43,12 @@ Pillow・SVG・DOM で描画系が違うため、同一の形を3か所に写し
 `logo.svg` は**サーバの配信allowlistに入れていない**(`server/kikimiru_server.py` の
 `WEB_ALLOWLIST`)。SVGは同一オリジンでのスクリプト実行経路になりうるため、実行時に不要な
 ものは配信しない方針に合わせた。実行時に使うのは PNG と `player.html` 内のインラインSVGだけ。
+
+**READMEの見出しには `logo.svg` ではなく `icon-192.png` を使っている。** `logo.svg` は
+`prefers-color-scheme` で色を切り替えるが、GitHub上でその CSS が効く保証がなく、落ちた場合は
+ライト用の濃色(`#232019`)がダークテーマでほぼ見えなくなる。地色を焼き込んだPNGなら
+どちらのテーマでも同じに見えるため、そちらを採った。SVGへ戻す場合は、GitHubの
+ライト/ダーク両方で実際に表示を確認すること。
 
 ## 配色
 

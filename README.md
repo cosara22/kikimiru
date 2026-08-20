@@ -1,3 +1,5 @@
+<img src="web/icon-192.png" width="76" alt="">
+
 # kikimiru <sub>(working title)</sub>
 
 **Self-hosted audio player with synchronized slides.**
@@ -84,6 +86,8 @@ Roadmap: offline book downloads, multi-user, native mobile apps.
 [AGPL-3.0](LICENSE). Contributions require the lightweight CLA described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
+
+<img src="web/icon-192.png" width="76" alt="">
 
 # kikimiru(仮称)
 
