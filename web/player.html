@@ -1271,6 +1271,53 @@
       return caches.delete(cname).then(function () { throw e; });
     });
   }
+  // ---- ダウンロードキュー(直列) ----
+  // ビューを跨いで生き続けるモジュール状態。進捗は document への
+  // "kikimiru-dl" イベントで配信し、各画面のボタンが自律的に追従する
+  var dlQueue = [];
+  var dlActive = null;   // { key, got, total }
+  function dlKey(b) { return b.library + "/" + b.id; }
+  function dlState(lib, id) {
+    var key = lib + "/" + id;
+    if (dlActive && dlActive.key === key) return "active";
+    if (dlQueue.some(function (q) { return dlKey(q) === key; })) return "queued";
+    return null;
+  }
+  function emitDl(type, key, extra) {
+    try {
+      document.dispatchEvent(new CustomEvent("kikimiru-dl",
+        { detail: Object.assign({ type: type, key: key }, extra || {}) }));
+    } catch (e) { /* CustomEvent非対応環境では静かに進む */ }
+  }
+  function enqueueDownload(book) {
+    if (dlState(book.library, book.id)) return;
+    dlQueue.push(book);
+    emitDl("queued", dlKey(book));
+    pumpDl();
+  }
+  function pumpDl() {
+    if (dlActive || !dlQueue.length) return;
+    var book = dlQueue.shift();
+    var key = dlKey(book);
+    dlActive = { key: key, got: 0, total: 0 };
+    emitDl("start", key);
+    downloadBook(book, function (got, total) {
+      if (dlActive && dlActive.key === key) { dlActive.got = got; dlActive.total = total; }
+      emitDl("progress", key, { got: got, total: total });
+    }).then(function () {
+      dlActive = null;
+      emitDl("done", key);
+      pumpDl();
+    }).catch(function (e) {
+      dlActive = null;
+      emitDl("error", key, {
+        message: (e && e.message) || String(e),
+        quota: !!(e && e.name === "QuotaExceededError")
+      });
+      pumpDl();
+    });
+  }
+
   // 保存済みブックの一覧(キャッシュ実在ベース)。localStorageの記録は容量表示用で、
   // キャッシュ側に無いエントリは「システムに消された」ものとして掃除する
   function listSavedBooks() {
@@ -2133,6 +2180,29 @@
         head.appendChild(el("span", "nm", c.name));
         head.appendChild(el("span", "ct", c.books.length + "冊"));
         var ops = el("div", "ops");
+        // コレクション単位の一括保存(未保存のものだけ直列キューへ)
+        if (offlineCapable()) {
+          var bulkBtn = el("button", "btn", "一括保存");
+          bulkBtn.type = "button";
+          bulkBtn.addEventListener("click", function () {
+            var members = c.books.map(function (id) { return byId[id]; }).filter(Boolean);
+            Promise.all(members.map(function (m) {
+              return isBookDownloaded(m.library, m.id).then(function (has) {
+                return (has || dlState(m.library, m.id)) ? null : m;
+              });
+            })).then(function (list) {
+              var targets = list.filter(Boolean);
+              targets.forEach(enqueueDownload);
+              bulkBtn.textContent = targets.length
+                ? targets.length + "冊をキューに追加"
+                : "すべて保存済み";
+              setTimeout(function () {
+                if (bulkBtn.isConnected) bulkBtn.textContent = "一括保存";
+              }, 2500);
+            });
+          });
+          ops.appendChild(bulkBtn);
+        }
         var editBtn = el("button", "btn", "ブックを追加/編集");
         editBtn.type = "button";
         // 削除は2段階(1回目で確認状態、3秒で戻る) — confirm()ダイアログは使わない
@@ -2235,6 +2305,76 @@
         }).catch(function () { quotaLabel.textContent = "空き容量: 不明"; });
       } else {
         quotaLabel.textContent = "空き容量: 不明";
+      }
+
+      // 永続化(persist)の状態と保護要求。要求は保証ではないことを正直に示す
+      if (navigator.storage && navigator.storage.persisted) {
+        var perRow = el("div", "row1");
+        perRow.style.marginTop = "10px";
+        var perLabel = el("span", null, "保護状態: 確認中…");
+        perRow.appendChild(perLabel);
+        gauge.appendChild(perRow);
+        navigator.storage.persisted().then(function (isP) {
+          if (isP) {
+            perLabel.textContent = "保護状態: 永続化済み(容量逼迫時にも自動削除されにくい)";
+            return;
+          }
+          perLabel.textContent = "保護状態: 未保護(ブラウザの判断で自動削除され得る)";
+          var perBtn = el("button", "off-row-del", "保護を要求");
+          perBtn.style.color = "var(--tint)";
+          perBtn.type = "button";
+          perBtn.addEventListener("click", function () {
+            navigator.storage.persist().then(function (granted) {
+              perBtn.remove();
+              perLabel.textContent = granted
+                ? "保護状態: 永続化済み(容量逼迫時にも自動削除されにくい)"
+                : "保護状態: 要求は許可されませんでした(ホーム画面への追加や利用実績で許可されやすくなります)";
+            }).catch(function () {
+              perBtn.remove();
+              perLabel.textContent = "保護状態: 要求に失敗しました";
+            });
+          });
+          perRow.appendChild(perBtn);
+        }).catch(function () { perLabel.textContent = "保護状態: 不明"; });
+      }
+
+      // ダウンロード中/待機中の表示(進行があれば出す。完了で一覧を描き直す)
+      if (dlActive || dlQueue.length) {
+        var qBox = el("div", "off-gauge");
+        var qHead = el("div", "row1");
+        qHead.appendChild(el("span", null, "ダウンロード中"));
+        var qNow = el("span", null, "");
+        qHead.appendChild(qNow);
+        qBox.appendChild(qHead);
+        var qBar = el("div", "bar");
+        var qFill = document.createElement("i");
+        qBar.appendChild(qFill);
+        qBox.appendChild(qBar);
+        content.appendChild(qBox);
+        function paintQueue() {
+          if (!qBox.isConnected) {
+            document.removeEventListener("kikimiru-dl", onQ);
+            return;
+          }
+          if (dlActive) {
+            var pct = dlActive.total > 0 ? Math.round(dlActive.got / dlActive.total * 100) : 0;
+            qNow.textContent = dlActive.key.split("/").pop() + " " + pct + "%" +
+              (dlQueue.length ? " · 待機 " + dlQueue.length + "冊" : "");
+            qFill.style.width = pct + "%";
+          } else {
+            qNow.textContent = dlQueue.length ? "待機 " + dlQueue.length + "冊" : "完了";
+          }
+        }
+        function onQ(ev) {
+          if (ev.detail.type === "done" && !dlActive && !dlQueue.length) {
+            document.removeEventListener("kikimiru-dl", onQ);
+            if (qBox.isConnected) viewOffline();   // 一覧へ反映
+            return;
+          }
+          paintQueue();
+        }
+        document.addEventListener("kikimiru-dl", onQ);
+        paintQueue();
       }
 
       if (!saved.items.length) {
@@ -2459,13 +2599,29 @@
         }).then(function () { exportBtn.disabled = false; });
       });
       subs.appendChild(exportBtn);
-      // オフライン保存(Cache Storageへ一式保存。進捗はボタン自体に表示)
+      // オフライン保存(直列キューへ投入。進捗はボタン自体に表示され、
+      // ページを離れてもダウンロードは継続する)
       if (offlineCapable()) {
         var dlBtn = el("button", "sab", "オフライン保存");
         dlBtn.type = "button";
         dlBtn.dataset.state = "none";
         var dlArm = null;
+        var myKey = b.library + "/" + b.id;
         function paintDl() {
+          if (!dlBtn.isConnected) return;
+          var st2 = dlState(b.library, b.id);
+          if (st2 === "queued") {
+            dlBtn.dataset.state = "busy";
+            dlBtn.textContent = "待機中…";
+            return;
+          }
+          if (st2 === "active") {
+            dlBtn.dataset.state = "busy";
+            dlBtn.textContent = dlActive.total > 0
+              ? "保存中… " + Math.min(99, Math.round(dlActive.got / dlActive.total * 100)) + "%"
+              : "保存中…";
+            return;
+          }
           isBookDownloaded(b.library, b.id).then(function (has) {
             if (!dlBtn.isConnected) return;
             dlBtn.classList.remove("danger-armed");
@@ -2473,6 +2629,30 @@
             dlBtn.textContent = has ? "保存を削除" : "オフライン保存";
           });
         }
+        function onDlEvent(ev) {
+          if (!dlBtn.isConnected) {
+            document.removeEventListener("kikimiru-dl", onDlEvent);
+            return;
+          }
+          if (ev.detail.key !== myKey) return;
+          if (ev.detail.type === "done") {
+            paintDl();
+            // 非インストール環境には一度だけ、消えやすさを正直に案内する
+            if (!window.matchMedia("(display-mode: standalone)").matches &&
+                lsGet("kikimiru.dlhint") !== "1") {
+              lsSet("kikimiru.dlhint", "1");
+              warn("保存しました。ブラウザのタブ利用では、長期間使わないと保存が消されることがあります。ホーム画面に追加(インストール)すると保たれやすくなります。");
+            }
+          } else if (ev.detail.type === "error") {
+            paintDl();
+            warn(ev.detail.quota
+              ? "空き容量が足りないため保存できませんでした。"
+              : "オフライン保存に失敗しました: " + ev.detail.message);
+          } else {
+            paintDl();
+          }
+        }
+        document.addEventListener("kikimiru-dl", onDlEvent);
         dlBtn.addEventListener("click", function () {
           if (dlBtn.dataset.state === "busy") return;
           if (dlBtn.dataset.state === "saved") {
@@ -2487,27 +2667,8 @@
             dlArm = setTimeout(paintDl, 3000);
             return;
           }
-          dlBtn.dataset.state = "busy";
-          downloadBook(b, function (got, total) {
-            dlBtn.textContent = total > 0
-              ? "保存中… " + Math.min(99, Math.round(got / total * 100)) + "%"
-              : "保存中… " + (got / 1048576).toFixed(1) + "MB";
-          }).then(function () {
-            paintDl();
-            // 非インストール環境には一度だけ、消えやすさを正直に案内する
-            if (!window.matchMedia("(display-mode: standalone)").matches &&
-                lsGet("kikimiru.dlhint") !== "1") {
-              lsSet("kikimiru.dlhint", "1");
-              warn("保存しました。ブラウザのタブ利用では、長期間使わないと保存が消されることがあります。ホーム画面に追加(インストール)すると保たれやすくなります。");
-            }
-          }).catch(function (e) {
-            paintDl();
-            if (e && e.name === "QuotaExceededError") {
-              warn("空き容量が足りないため保存できませんでした。");
-            } else {
-              warn("オフライン保存に失敗しました: " + (e && e.message || e));
-            }
-          });
+          enqueueDownload(b);
+          paintDl();
         });
         subs.appendChild(dlBtn);
         paintDl();
