@@ -69,6 +69,20 @@ function markCached(response) {
   ) : response;
 }
 
+/** キャッシュ照合。書き込み完了直後の読み取りが一時的に取りこぼされることが
+ *  稀にある(実測: エントリ実在なのに match が undefined を返し、直後の再照合は
+ *  成功する)ため、ミス時は少し待って最大2回引き直す。真のミスには合計~700msの
+ *  遅延が乗るが、ネットワーク不達時のエラー経路なので許容する。 */
+function matchWithRetry(cacheKey) {
+  return caches.match(cacheKey).then((hit) => {
+    if (hit) return hit;
+    return new Promise((res) => setTimeout(res, 350))
+      .then(() => caches.match(cacheKey))
+      .then((second) => second || new Promise((res) => setTimeout(res, 350))
+        .then(() => caches.match(cacheKey)));
+  });
+}
+
 function networkFirst(request, cacheKey, timeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
@@ -90,7 +104,7 @@ function networkFirst(request, cacheKey, timeoutMs) {
     }).catch(() => {
       clearTimeout(timer);
       if (settled) return;
-      caches.match(cacheKey).then((cached) => {
+      matchWithRetry(cacheKey).then((cached) => {
         settled = true;
         if (cached) resolve(markCached(cached));
         else resolve(new Response("offline", { status: 503, statusText: "Offline" }));
@@ -124,7 +138,7 @@ async function rangeWithOfflineFallback(req) {
   try {
     return await fetch(req);
   } catch (e) {
-    const full = await caches.match(req.url);
+    const full = await matchWithRetry(req.url);
     if (!full) return new Response("offline", { status: 503, statusText: "Offline" });
     const blob = await full.blob();
     const range = parseRange(req.headers.get("Range"), blob.size);
@@ -175,7 +189,7 @@ self.addEventListener("fetch", (event) => {
   if (audioExts.some((ext) => p.toLowerCase().endsWith(ext))) {
     if (p.startsWith("/books/")) {
       event.respondWith(fetch(req).catch(() =>
-        caches.match(req.url).then((cached) =>
+        matchWithRetry(req.url).then((cached) =>
           cached || new Response("offline", { status: 503, statusText: "Offline" }))));
     }
     return;
