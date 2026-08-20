@@ -16,7 +16,7 @@ For your own lectures, recordings, narrated tutorials, language practice, and pu
 ![Home — resume card, recently added, series and browse](docs/screenshots/home.png)
 
 <p>
-<img src="docs/screenshots/player.png" width="49%" alt="Player — synchronized slide view with cue-marked scrubber and slide filmstrip">
+<img src="docs/screenshots/player.png" width="49%" alt="Player — slide view synchronized to playback, with the chapter list marking the current slide">
 <img src="docs/screenshots/book-detail.png" width="49%" alt="Book detail — cover, metadata, tags, description and play actions">
 </p>
 <img src="docs/screenshots/mobile-home.png" width="32%" alt="Home on a phone-sized viewport with bottom tab bar">
@@ -103,7 +103,7 @@ Roadmap: offline book downloads, multi-user, native mobile apps.
 ![ホーム — 続きから・最近追加・シリーズ・ブラウズ](docs/screenshots/home.png)
 
 <p>
-<img src="docs/screenshots/player.png" width="49%" alt="プレイヤー — cue目盛付きシークバーとスライド一覧を備えた同期表示">
+<img src="docs/screenshots/player.png" width="49%" alt="プレイヤー — 再生位置に同期したスライド表示と、現在位置を示すチャプター一覧">
 <img src="docs/screenshots/book-detail.png" width="49%" alt="ブック詳細 — カバー・書誌・タグ・説明文と再生操作">
 </p>
 <img src="docs/screenshots/mobile-home.png" width="32%" alt="モバイル幅のホーム(下部タブバー)">
