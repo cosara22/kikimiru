@@ -31,6 +31,7 @@ class OfflineCoreTest(unittest.TestCase):
         self.server.start()   # 前のテストが止めたままでも復帰させる
         self.ctx = harness.mobile_context(self.browser)
         self.page = self.ctx.new_page()
+        self.console = harness.attach_console(self.page)
         harness.login(self.page, self.server.base)
         harness.wait_sw(self.page)
 
@@ -80,10 +81,14 @@ class OfflineCoreTest(unittest.TestCase):
                   wait_until="domcontentloaded")
         # src は一旦HTTP URLが入り、キャッシュ照合後に非同期でblobへ差し替わる。
         # 「srcが真」ではなく「blob:になった」ことを条件として待つ(速度差でのフレーク対策)
-        page.wait_for_function(
-            "() => { const a = document.getElementById('audio');"
-            " return a && a.src.indexOf('blob:') === 0; }",
-            timeout=20000)
+        try:
+            page.wait_for_function(
+                "() => { const a = document.getElementById('audio');"
+                " return a && a.src.indexOf('blob:') === 0; }",
+                timeout=20000)
+        except Exception:
+            harness.dump_state(page, "blob差し替え待ちタイムアウト", self.console)
+            raise
         page.evaluate("() => document.getElementById('audio').play()")
         page.wait_for_function(
             "() => { const a = document.getElementById('audio');"

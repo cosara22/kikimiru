@@ -143,6 +143,39 @@ def wait_sw(page):
     page.wait_for_function("() => !!navigator.serviceWorker.controller", timeout=20000)
 
 
+def attach_console(page):
+    """コンソール出力とページ内例外の収集を開始し、収集先リストを返す(失敗時診断用)。"""
+    logs = []
+    page.on("console", lambda m: logs.append("[%s] %s" % (m.type, m.text)))
+    page.on("pageerror", lambda e: logs.append("[pageerror] %s" % e))
+    return logs
+
+
+def dump_state(page, label, console=None):
+    """タイムアウト時の原因切り分け用に、ページ状態を標準出力へ書き出す。"""
+    try:
+        st = page.evaluate("""async () => ({
+          url: location.href,
+          ua: navigator.userAgent,
+          onLine: navigator.onLine,
+          swControlled: !!navigator.serviceWorker.controller,
+          warn: (document.getElementById('warn') || {}).textContent || '',
+          netBadge: (function () {
+            var b = document.getElementById('netBadge');
+            return b ? getComputedStyle(b).display : '(要素なし)';
+          })(),
+          audioSrc: ((document.getElementById('audio') || {}).src || '').slice(0, 80),
+          cacheKeys: await caches.keys(),
+          bodyHead: document.body.textContent.replace(/\\s+/g, ' ').slice(0, 300),
+        })""")
+    except Exception as e:
+        st = "evaluate失敗: %r" % (e,)
+    print("\n==== 診断: %s ====\n%s" % (label, json.dumps(st, ensure_ascii=False, indent=1)
+                                        if isinstance(st, dict) else st), flush=True)
+    if console:
+        print("---- コンソール末尾 ----\n%s\n" % "\n".join(console[-30:]), flush=True)
+
+
 def wait_api_cached(page):
     """オフライン遷移の前提となるAPIスナップショットがSWキャッシュに載るまで待つ。
 

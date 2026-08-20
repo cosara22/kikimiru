@@ -27,6 +27,7 @@ class OfflineUiTest(unittest.TestCase):
         self.server.start()
         self.ctx = harness.mobile_context(self.browser)
         self.page = self.ctx.new_page()
+        self.console = harness.attach_console(self.page)
         harness.login(self.page, self.server.base)
         harness.wait_sw(self.page)
 
@@ -133,10 +134,14 @@ class OfflineUiTest(unittest.TestCase):
         page.goto(self.server.base + "/web/player.html?view=home",
                   wait_until="domcontentloaded")
         # バッジ表示は時間ではなく状態として待つ(遅い環境でのフレーク対策)
-        page.wait_for_function(
-            "() => { const b = document.getElementById('netBadge');"
-            " return b && getComputedStyle(b).display !== 'none'; }",
-            timeout=20000)
+        try:
+            page.wait_for_function(
+                "() => { const b = document.getElementById('netBadge');"
+                " return b && getComputedStyle(b).display !== 'none'; }",
+                timeout=20000)
+        except Exception:
+            harness.dump_state(page, "オフラインバッジ待ちタイムアウト", self.console)
+            raise
         # 未保存ブック: 入口ガードでオーバーレイを開かず理由を表示する
         page.goto(self.server.base + "/web/player.html?view=book&book=demo-guide-2",
                   wait_until="domcontentloaded")
