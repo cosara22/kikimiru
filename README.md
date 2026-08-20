@@ -23,6 +23,30 @@ For your own lectures, recordings, narrated tutorials, language practice, and pu
 </p>
 <img src="docs/screenshots/mobile-home.png" width="32%" alt="Home on a phone-sized viewport with bottom tab bar">
 
+## Player
+
+- **Two views, one player.** The default view shows the cover (square, on a blurred
+  backdrop); a segmented tab at the top switches to the 16:9 slide view. Your choice is
+  remembered per device.
+- **Chapter list.** Scroll up and the chapters — number, timestamp, heading and key points
+  from `content.json` — stack vertically; tapping one seeks the audio. While you browse,
+  the slide stays pinned on top with full controls overlaid, and the list follows the
+  current chapter during playback (never while you are scrolling it yourself).
+- **Fullscreen.** The ⛶ button — or simply rotating a phone to landscape — switches to a
+  fullscreen slide view with tap-to-show controls that auto-hide during playback.
+  Double-tap the left/right side to skip ±10s. Rotating back restores the portrait layout.
+- **Desktop layout.** On wide screens the player becomes two columns: media with hover
+  controls on the left (click the slide to play/pause), an independently scrolling chapter
+  panel on the right.
+- **Playback controls.** ±30s skip, playback speed and a sleep timer chosen from popup
+  menus, chapter markers on the seek bar, remaining time at the current speed, and Media
+  Session integration for lock-screen control.
+- **Mini player.** The persistent dock stays live-synced to playback (progress, remaining
+  time, play/pause in place), and reopening the player never interrupts the audio.
+- **Chapter export.** Book detail can export Podcasting 2.0 JSON Chapters built from the
+  structure side only (`deck.json` timing + chapter titles — see
+  [docs/SCHEMA.md](docs/SCHEMA.md)).
+
 ## Quickstart
 
 Set a password once, then start the server (the bundled demo library is served by default —
@@ -78,7 +102,9 @@ working read-only when the server is unreachable (last-fetched snapshot). Two ho
 ## Status
 
 Phase 1 complete — library experience (multi-library, search, series/authors/tags, book
-detail, immersive player), password auth, cross-device progress sync, PWA, Docker/GHCR.
+detail), a fully rebuilt player (cover/slide views, chapter list, rotation fullscreen,
+desktop two-column layout, live-synced mini player, chapter export), password auth,
+cross-device progress sync, PWA, Docker/GHCR.
 Roadmap: offline book downloads, multi-user, native mobile apps.
 
 ## License
@@ -111,6 +137,27 @@ Roadmap: offline book downloads, multi-user, native mobile apps.
 <img src="docs/screenshots/book-detail.png" width="49%" alt="ブック詳細 — カバー・書誌・タグ・説明文と再生操作">
 </p>
 <img src="docs/screenshots/mobile-home.png" width="32%" alt="モバイル幅のホーム(下部タブバー)">
+
+## プレイヤー
+
+- **1つのプレイヤーに2つの表示。** 既定はぼかし背景の上の正方形の表紙。上部のタブで
+  16:9のスライド表示へ切り替えられ、選択は端末ごとに記憶されます
+- **チャプター一覧。** 下から上へスクロールすると、章(番号・時刻・見出し・`content.json`
+  の要点)が縦に積み上がり、タップでその時間へシークします。閲覧中もスライドは上部に
+  固定され、フル操作が面内に出ます。再生が進むと一覧は現在の章へ自動で追従します
+  (自分でスクロールしている間は動きません)
+- **全画面。** ⛶ボタン、またはスマホを横向きにするだけで全画面のスライド表示へ。
+  コントロールはタップで表示・再生中は自動で隠れ、左右のダブルタップで±10秒送れます。
+  縦に戻すと元のレイアウトへ復帰します
+- **デスクトップ。** 広い画面では2カラムになり、左はホバー操作つきのメディア
+  (スライド面のクリックで再生/一時停止)、右は独立してスクロールするチャプター欄です
+- **再生操作。** ±30秒スキップ、ポップアップから選ぶ再生速度とスリープタイマー、
+  シークバー上の章の目盛、再生速度で換算した残り時間、ロック画面操作(Media Session)
+- **ミニプレイヤー。** 常駐ドックは再生にライブ同期し(進捗・残り時間・その場での
+  再生/一時停止)、プレイヤーを開き直しても音声は途切れません
+- **チャプター書き出し。** ブック詳細から Podcasting 2.0 JSON Chapters 形式で
+  書き出せます。内容は構造側(`deck.json` の時刻+章タイトル)のみです
+  ([docs/SCHEMA.md](docs/SCHEMA.md))
 
 ## 使い方
 
@@ -159,6 +206,8 @@ manifest と Service Worker を同梱しており、ホーム画面/デスクト
 
 ## ステータス
 
-Phase 1 完了 — ライブラリ体験(複数ライブラリ・検索・シリーズ/著者/タグ・ブック詳細・
-没入プレイヤー)、パスワード認証、端末間進捗同期、PWA、Docker/GHCR。
+Phase 1 完了 — ライブラリ体験(複数ライブラリ・検索・シリーズ/著者/タグ・ブック詳細)、
+プレイヤーの全面再構築(表紙/スライドの2表示・チャプター一覧・回転連動の全画面・
+デスクトップ2カラム・ライブ同期ミニプレイヤー・チャプター書き出し)、パスワード認証、
+端末間進捗同期、PWA、Docker/GHCR。
 ロードマップ: ブック単位のオフライン保存・マルチユーザー・ネイティブアプリ。

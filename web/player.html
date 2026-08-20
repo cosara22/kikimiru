@@ -637,8 +637,25 @@
   .np-resume b { color: var(--tint); }
   .np-resume button { margin-left: auto; color: var(--tint); font-size: 12.5px;
     font-weight: 600; flex-shrink: 0; }
-  .np-title h1 { font-size: 21px; font-weight: 800; line-height: 1.35; }
+  /* タイトルは1行。収まらない長題は左右に流して全文を見せる(マーキー) */
+  .np-title h1 { font-size: 21px; font-weight: 800; line-height: 1.35;
+    white-space: nowrap; overflow: hidden; }
+  .np-title h1 span { display: inline-block; white-space: nowrap; }
+  .np-title h1.marquee span {
+    animation: np-marq var(--marq-dur, 12s) linear infinite alternate; }
+  @keyframes np-marq {
+    0%, 18% { transform: translateX(0); }
+    82%, 100% { transform: translateX(var(--marq-x, 0)); }
+  }
   .np-title .sub { margin-top: 4px; font-size: 13.5px; color: var(--ink2); }
+  /* 全画面ダブルタップの±10秒表示 */
+  .np-skipflash { position: absolute; top: 50%; transform: translateY(-50%);
+    z-index: 5; color: #fff; font-size: 15px; font-weight: 700;
+    background: rgba(0,0,0,.45); border-radius: 99px; padding: 10px 18px;
+    pointer-events: none; animation: np-skipfade .7s ease-out forwards; }
+  .np-skipflash.left { left: 10%; }
+  .np-skipflash.right { right: 10%; }
+  @keyframes np-skipfade { 0% { opacity: 1; } 60% { opacity: 1; } 100% { opacity: 0; } }
   .np-chips { display: flex; gap: 9px; margin-top: 14px; overflow-x: auto;
     scrollbar-width: none; }
   .np-chips::-webkit-scrollbar { display: none; }
@@ -2051,6 +2068,51 @@
         viewBook(bookId);  // 状態を反映して再描画
       });
       subs.appendChild(markDone);
+      // チャプター書き出し(Podcasting 2.0 JSON Chapters)。
+      // 内容は deck 側の構造(開始秒)+章タイトルのみ(構造と本文の分離の原則)
+      var exportBtn = el("button", "sab", "チャプター書き出し");
+      exportBtn.type = "button";
+      exportBtn.addEventListener("click", function () {
+        exportBtn.disabled = true;
+        var base2 = bookBase(b.library, b.id);
+        Promise.all([
+          fetch(base2 + "deck.json").then(function (r) {
+            if (!r.ok) throw new Error("deck.json " + r.status);
+            return r.json();
+          }),
+          fetch(base2 + "content.json").then(function (r) {
+            return r.ok ? r.json() : null;
+          }).catch(function () { return null; })
+        ]).then(function (res) {
+          var deck = res[0];
+          var bodyMap = Object.create(null);
+          if (res[1] && res[1].slides) {
+            Object.keys(res[1].slides).forEach(function (k) { bodyMap[k] = res[1].slides[k]; });
+          }
+          var cues2 = (deck.cues || []).slice().sort(function (x, y) { return x.t - y.t; });
+          if (!cues2.length) throw new Error("cues がありません");
+          var chapters = cues2.map(function (cue) {
+            var body2 = bodyMap[cue.slide] || {};
+            return {
+              startTime: cue.t,
+              title: (typeof body2.title === "string" && body2.title) || cue.slide
+            };
+          });
+          var blob = new Blob(
+            [JSON.stringify({ version: "1.2.0", chapters: chapters }, null, 2)],
+            { type: "application/json+chapters" });
+          var dl = document.createElement("a");
+          dl.href = URL.createObjectURL(blob);
+          dl.download = b.id + ".chapters.json";
+          document.body.appendChild(dl);
+          dl.click();
+          dl.remove();
+          setTimeout(function () { URL.revokeObjectURL(dl.href); }, 5000);
+        }).catch(function (e) {
+          warn("チャプターを書き出せませんでした: " + (e.message || e));
+        }).then(function () { exportBtn.disabled = false; });
+      });
+      subs.appendChild(exportBtn);
       box.appendChild(subs);
 
       var group = el("div", "meta-group");
@@ -2291,7 +2353,7 @@
       '<div class="np-head">' +
       '<div class="np-resume" id="npResume"><span>前回の続き <b id="resumeAt"></b> から再開します</span>' +
       '<button type="button" id="resumeOff">最初から</button></div>' +
-      '<div class="np-title"><h1 id="npTitle"></h1><div class="sub" id="npSub"></div></div>' +
+      '<div class="np-title"><h1 id="npTitleBox"><span id="npTitle"></span></h1><div class="sub" id="npSub"></div></div>' +
       '<div class="np-chips">' +
       '<button type="button" class="np-chip" id="chipChapters">チャプター</button>' +
       '<a class="np-chip" id="chipDetail">タイトル詳細</a>' +
@@ -2387,6 +2449,21 @@
         subParts.push(meta.series.name + (meta.series.sequence ? " #" + meta.series.sequence : ""));
       }
       $("npSub").textContent = subParts.join(" · ");
+      // 1行に収まらない長題は左右に流して全文を見せる(幅変化にも追従)
+      function fitMarquee() {
+        var h1 = $("npTitleBox");
+        var span = $("npTitle");
+        var over = span.scrollWidth - h1.clientWidth;
+        if (over > 8) {
+          h1.classList.add("marquee");
+          h1.style.setProperty("--marq-x", (-(over + 16)) + "px");
+          h1.style.setProperty("--marq-dur", Math.max(6, over / 22) + "s");
+        } else {
+          h1.classList.remove("marquee");
+        }
+      }
+      fitMarquee();
+      on(window, "resize", fitMarquee);
       document.title = title + " — kikimiru";
       if (!res[1]) warn("content.json が無いため、スライドは構成情報のみ表示しています。");
 
@@ -2521,6 +2598,7 @@
           if (j === i) elm.setAttribute("aria-current", "true");
           else elm.removeAttribute("aria-current");
         });
+        followChapter(i);
       }
 
       function cueAt(t) {
@@ -2822,6 +2900,16 @@
       stagebox.addEventListener("pointerdown", function (ev) {
         if (ev.pointerType) lastPointerType = ev.pointerType;
       });
+      // ダブルタップ±10秒の表示(左右にラベルを一瞬出す)
+      function flashSkip(label, side) {
+        var old = stagebox.querySelector(".np-skipflash");
+        if (old) old.remove();
+        var f = el("div", "np-skipflash " + side, label);
+        stagebox.appendChild(f);
+        setTimeout(function () { f.remove(); }, 750);
+      }
+      var lastTapT = 0, lastTapX = 0, tapTimer = null;
+      cleanups.push(function () { if (tapTimer) clearTimeout(tapTimer); });
       stagebox.addEventListener("click", function (ev) {
         // ボタン・シークバーへのタップはコントロールの開閉として扱わない。
         // ボタン側のハンドラが innerHTML でアイコンを差し替えると ev.target が
@@ -2829,6 +2917,37 @@
         if (!ev.target.isConnected ||
             ev.target.closest("button") || ev.target.closest(".c-track")) return;
         if (lastPointerType === "mouse") { togglePlay(); return; }
+        // タッチ・全画面中: ダブルタップで±10秒(左右)/中央は再生切替。
+        // 単タップは誤発火しないよう260ms待ってから開閉を確定する
+        var now = performance.now();
+        var x = ev.clientX;
+        if (fsOn && now - lastTapT < 300 && Math.abs(x - lastTapX) < 90) {
+          lastTapT = 0;
+          if (tapTimer) { clearTimeout(tapTimer); tapTimer = null; }
+          var rect = stagebox.getBoundingClientRect();
+          var rel = (x - rect.left) / rect.width;
+          if (rel < 0.35) {
+            audio.currentTime = Math.max(0, audio.currentTime - 10);
+            flashSkip("−10秒", "left");
+          } else if (rel > 0.65) {
+            audio.currentTime = Math.min(dur() || Infinity, audio.currentTime + 10);
+            flashSkip("+10秒", "right");
+          } else {
+            togglePlay();
+          }
+          return;
+        }
+        lastTapT = now;
+        lastTapX = x;
+        if (fsOn) {
+          if (tapTimer) clearTimeout(tapTimer);
+          tapTimer = setTimeout(function () {
+            tapTimer = null;
+            if (stagebox.classList.contains("ctl")) stagebox.classList.remove("ctl");
+            else showCtl();
+          }, 260);
+          return;
+        }
         if (stagebox.classList.contains("ctl")) stagebox.classList.remove("ctl");
         else showCtl();
       });
@@ -3052,6 +3171,36 @@
       $("chCount").textContent = "全" + cues.length + "章";
       $("chipChapters").textContent = "チャプター " + cues.length;
       $("npHint").textContent = "チャプター(" + cues.length + ")";
+
+      // ---- チャプターの自動追従 ----
+      // 再生が次の章へ進んだら、一覧をその章が見える位置まで寄せる。
+      // ユーザーが一覧を触っている間(4秒)は動かさない(読みの邪魔をしない)
+      var chFollowMuteUntil = 0;
+      function muteFollow() { chFollowMuteUntil = Date.now() + 4000; }
+      ["wheel", "touchmove", "pointerdown"].forEach(function (evn) {
+        $("npChapters").addEventListener(evn, muteFollow, { passive: true });
+        scrollEl.addEventListener(evn, muteFollow, { passive: true });
+      });
+      function followChapter(i) {
+        if (Date.now() < chFollowMuteUntil) return;
+        var item = chapEls[i];
+        if (!item) return;
+        var chs = $("npChapters");
+        // デスクトップ2カラムではチャプター列自身が、それ以外はページ全体がスクローラ
+        var cont = (chs.scrollHeight > chs.clientHeight + 4) ? chs : scrollEl;
+        if (cont === scrollEl && !wrap.classList.contains("scrolled")) return;
+        var topPad = 72;
+        if (cont === scrollEl) {
+          var mediaEl = wrap.querySelector(".np-media");
+          topPad = 52 + (npMode === "slide" ? mediaEl.offsetHeight : 58) + 12;
+        }
+        var cRect = cont.getBoundingClientRect();
+        var iRect = item.getBoundingClientRect();
+        if (iRect.top < cRect.top + topPad || iRect.bottom > cRect.bottom - 16) {
+          cont.scrollTo({ top: cont.scrollTop + (iRect.top - cRect.top) - topPad,
+                          behavior: "smooth" });
+        }
+      }
 
       // チャプターへのスクロール(チップ/下部の取っ手から)
       function scrollToChapters() {

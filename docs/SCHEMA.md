@@ -245,7 +245,22 @@ v2の書誌メタデータは**すべて任意**なので、**欠損はエラー
 - 型検査は版宣言に関わらず行う。つまり `kikimiru: 1` の deck に壊れた `authors` が
   入っていれば、版のWARNに加えて型のERRORも報告される
 
-## エクスポート(予定)
+## チャプター書き出し
 
-- [Podcasting 2.0 JSON Chapters](https://github.com/Podcastindex-org/podcast-namespace/blob/main/docs/examples/chapters/jsonChapters.md)
-  への書き出し(`startTime` + `title` + `img`)。書き出し対象は deck 側の構造+章タイトルに限る
+ブック詳細画面の「チャプター書き出し」ボタンで、
+[Podcasting 2.0 JSON Chapters](https://github.com/Podcastindex-org/podcast-namespace/blob/main/docs/examples/chapters/jsonChapters.md)
+形式のファイル(`<ブックID>.chapters.json`)を保存できる:
+
+```json
+{
+  "version": "1.2.0",
+  "chapters": [
+    { "startTime": 0.0, "title": "…" }
+  ]
+}
+```
+
+- 内容は **deck 側の構造(cue の開始秒)+章タイトルのみ**。`content.json` が無い場合、
+  タイトルはスライドIDで代替される
+- 本文(bullets・note・alt)や画像は書き出さない(構造と本文の分離の原則)。
+  クライアント側で生成するため、サーバに書き出し用のエンドポイントは無い
