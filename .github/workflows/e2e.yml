@@ -1,0 +1,27 @@
+name: e2e
+
+# ブラウザ実駆動のE2E(Playwright/Chromium)。プレイヤーUIとオフライン保存の回帰を守る。
+# 「真のオフライン」はテストハーネスがサーバプロセスを停止して再現する
+# (Playwrightの set_offline はService Workerの通信を遮断しないため)。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install playwright
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+      - name: run e2e
+        run: python -m unittest discover -s tests/e2e -p "test_*.py" -v

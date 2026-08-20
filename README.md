@@ -114,8 +114,8 @@ Phase 1 complete — library experience (multi-library, search, series/authors/t
 detail), a fully rebuilt player (cover/slide views, chapter list, rotation fullscreen,
 desktop two-column layout, live-synced mini player, chapter export), password auth,
 cross-device progress sync, PWA, Docker/GHCR. Per-book offline saving has landed
-(download, offline playback with seeking, delete).
-Roadmap: offline storage management UI, multi-user, native mobile apps.
+(queued downloads, offline playback with seeking, storage management, bulk save).
+Roadmap: multi-user, native mobile apps.
 
 ## License
 
@@ -227,5 +227,5 @@ Phase 1 完了 — ライブラリ体験(複数ライブラリ・検索・シリ
 プレイヤーの全面再構築(表紙/スライドの2表示・チャプター一覧・回転連動の全画面・
 デスクトップ2カラム・ライブ同期ミニプレイヤー・チャプター書き出し)、パスワード認証、
 端末間進捗同期、PWA、Docker/GHCR。ブック単位のオフライン保存が入りました
-(保存・オフライン再生/シーク・削除)。
-ロードマップ: オフライン保存の管理画面・マルチユーザー・ネイティブアプリ。
+(キュー式ダウンロード・オフライン再生/シーク・管理画面・一括保存)。
+ロードマップ: マルチユーザー・ネイティブアプリ。
