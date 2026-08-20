@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """オフライン保存の中核回帰。
 
-「真のオフライン」はサーバプロセス停止で再現する(set_offline はSWの通信を
-遮断しないため、それ単体では検証にならない)。navigator.onLine を偽にする
-必要がある検証(blobフォールバックの初期経路)だけ set_offline を併用する。
+「真のオフライン」はサーバプロセス停止で再現する。navigator.onLine を偽にする
+必要がある検証(blobフォールバックの初期経路)は harness.force_offline を使う
+(set_offline はSW通信を遮断せず、Linux headless では onLine にも反映されない)。
 """
 import unittest
 
@@ -76,7 +76,7 @@ class OfflineCoreTest(unittest.TestCase):
         self.assertEqual(rng["invalid"], 416)
 
         # blobフォールバック: 機内モード相当(onLine=false)で src が blob: になり再生できる
-        self.ctx.set_offline(True)
+        harness.force_offline(page, True)
         page.goto(self.server.base + "/web/player.html?book=" + BOOK,
                   wait_until="domcontentloaded")
         # src は一旦HTTP URLが入り、キャッシュ照合後に非同期でblobへ差し替わる。
@@ -103,7 +103,7 @@ class OfflineCoreTest(unittest.TestCase):
         page.evaluate("() => document.getElementById('audio').pause()")
 
         # 合成断片がサーバ応答とバイト単位で一致する
-        self.ctx.set_offline(False)
+        harness.force_offline(page, False)
         self.server.start()
         frag_on = page.evaluate("""async () => {
           const r = await fetch('/books/demo/%s/audio.mp3',

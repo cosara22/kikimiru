@@ -3,8 +3,9 @@
 
 - 一時state-dir(既知パスワードのauth.json)を作り、空きポートでデモサーバを起動する
 - 「真のオフライン」は**サーバプロセスの停止**で再現する。Playwrightの set_offline は
-  Service Workerの通信を遮断しないため、それ単体ではオフライン再生の検証にならない
-  (実測で確認済みの落とし穴)。navigator.onLine を偽にしたい検証だけ set_offline を併用する
+  (1) Service Workerの通信を遮断しない、(2) Linux headless では navigator.onLine すら
+  false にならない(CI実測: Windows では効き、Linux では効かない)。どちらの用途にも
+  使えないため使用禁止。onLine を偽にしたい検証は force_offline() を使う
 - サーバの標準出力はファイルへ逃がす。パイプのまま放置するとリクエストログで
   バッファが満杯になり、サーバが write でブロックして応答しなくなる(実測)
 
@@ -101,10 +102,40 @@ class Server:
             pass
 
 
+# navigator.onLine の決定論的な模擬。localStorageフラグ方式にすることで、
+# ページ遷移後の新しい文書でも(初期化スクリプトが毎回走るため)状態が引き継がれる
+_FORCE_OFFLINE_INIT = """(() => {
+  const orig = Object.getOwnPropertyDescriptor(Navigator.prototype, 'onLine').get;
+  Object.defineProperty(navigator, 'onLine', {
+    configurable: true,
+    get: () => {
+      try { if (localStorage.getItem('e2e.forceOffline') === '1') return false; } catch (e) {}
+      return orig.call(navigator);
+    },
+  });
+})();"""
+
+
 def mobile_context(browser, **kw):
-    return browser.new_context(viewport={"width": 390, "height": 844},
-                               has_touch=True, is_mobile=True,
-                               color_scheme="dark", **kw)
+    ctx = browser.new_context(viewport={"width": 390, "height": 844},
+                              has_touch=True, is_mobile=True,
+                              color_scheme="dark", **kw)
+    ctx.add_init_script(_FORCE_OFFLINE_INIT)
+    return ctx
+
+
+def force_offline(page, value):
+    """navigator.onLine を決定論的に切り替え、offline/online イベントを発火する。
+
+    set_offline は Linux headless で onLine に反映されない(CI実測)ため、
+    アプリが onLine を入力条件とする挙動(バッジ・入口ガード・blobフォールバック)は
+    この模擬で検証する。実際の到達不能は Server.stop() が担う。
+    """
+    page.evaluate("""v => {
+      if (v) localStorage.setItem('e2e.forceOffline', '1');
+      else localStorage.removeItem('e2e.forceOffline');
+      window.dispatchEvent(new Event(v ? 'offline' : 'online'));
+    }""", value)
 
 
 def login(page, base):
@@ -166,6 +197,14 @@ def dump_state(page, label, console=None):
           })(),
           audioSrc: ((document.getElementById('audio') || {}).src || '').slice(0, 80),
           cacheKeys: await caches.keys(),
+          shellCacheEntries: await caches.open('kikimiru-v5')
+            .then(c => c.keys())
+            .then(ks => ks.map(r => r.url.replace(location.origin, ''))),
+          libKey: localStorage.getItem('kikimiru.lib'),
+          probeMatch: !!(await caches.match('/api/books?library=demo')),
+          probeFetch: await fetch('/api/books?library=demo')
+            .then(r => r.status + ' cache=' + (r.headers.get('X-Kikimiru-Cache') || '0'))
+            .catch(e => 'reject: ' + e),
           bodyHead: document.body.textContent.replace(/\\s+/g, ' ').slice(0, 300),
         })""")
     except Exception as e:
@@ -176,17 +215,28 @@ def dump_state(page, label, console=None):
         print("---- コンソール末尾 ----\n%s\n" % "\n".join(console[-30:]), flush=True)
 
 
-def wait_api_cached(page):
+def wait_api_cached(page, lib="demo", timeout=15.0):
     """オフライン遷移の前提となるAPIスナップショットがSWキャッシュに載るまで待つ。
 
     SWの cache.put は応答返却後の非同期処理のため、応答直後にサーバを止めると
     スナップショットが欠けたままになり、オフライン画面(起動の /api/libraries、
-    詳細フォールバックの /api/books)が組み立てられないことがある(実測フレーク)。
+    詳細フォールバックの /api/books?library=…)が組み立てられない(実測フレーク)。
+
+    注意: 照合はキャッシュキーと完全一致のクエリ付きURLで行う(api() は常に
+    library= を付ける)。また wait_for_function にasync関数を渡すとPromise自体が
+    truthy扱いされ即座に通過してしまうため、Promiseを正しくawaitする
+    page.evaluate をPython側でポーリングする。
     """
-    page.wait_for_function(
-        "async () => !!(await caches.match('/api/libraries'))"
-        " && !!(await caches.match('/api/books'))",
-        timeout=15000)
+    deadline = time.time() + timeout
+    while True:
+        ok = page.evaluate(
+            "async (lib) => !!(await caches.match('/api/libraries'))"
+            " && !!(await caches.match('/api/books?library=' + lib))", lib)
+        if ok:
+            return
+        if time.time() > deadline:
+            raise RuntimeError("APIスナップショットがキャッシュに載りませんでした")
+        page.wait_for_timeout(200)
 
 
 def save_book(page, base, book_id):

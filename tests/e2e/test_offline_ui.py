@@ -130,7 +130,7 @@ class OfflineUiTest(unittest.TestCase):
                   wait_until="networkidle")
         harness.wait_api_cached(page)   # cache.put完了前に止めると欠ける(非同期put対策)
         self.server.stop()
-        self.ctx.set_offline(True)   # navigator.onLine=false(バッジ・ガードの条件)
+        harness.force_offline(page, True)   # navigator.onLine=false(バッジ・ガードの条件)
         page.goto(self.server.base + "/web/player.html?view=home",
                   wait_until="domcontentloaded")
         # バッジ表示は時間ではなく状態として待つ(遅い環境でのフレーク対策)
@@ -145,7 +145,11 @@ class OfflineUiTest(unittest.TestCase):
         # 未保存ブック: 入口ガードでオーバーレイを開かず理由を表示する
         page.goto(self.server.base + "/web/player.html?view=book&book=demo-guide-2",
                   wait_until="domcontentloaded")
-        page.wait_for_selector(".cta", timeout=20000)
+        try:
+            page.wait_for_selector(".cta", timeout=20000)
+        except Exception:
+            harness.dump_state(page, "未保存ブック詳細のCTA待ちタイムアウト", self.console)
+            raise
         page.click(".cta")
         page.wait_for_function(
             "() => document.getElementById('warn').textContent"
@@ -153,7 +157,7 @@ class OfflineUiTest(unittest.TestCase):
             timeout=10000)
         self.assertFalse(page.evaluate(
             "() => document.body.classList.contains('player-open')"))
-        self.ctx.set_offline(False)
+        harness.force_offline(page, False)
 
 
 if __name__ == "__main__":
