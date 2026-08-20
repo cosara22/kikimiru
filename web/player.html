@@ -2903,10 +2903,47 @@
       if (/[\/\\]|\.\.|[?#]/.test(audioName)) {
         warn("音声ファイル名が不正なため読み込みを中止しました: " + audioName);
       } else {
+        var audioUrl = base + encodeURIComponent(audioName);
+        // オフライン再生のフォールバック: 保存済みキャッシュからBlobを取り出し
+        // blob: URLで直接再生する。iOSにはメディア要素のリクエストがService Workerを
+        // 経由しない挙動があり、SW側の206合成だけでは再生が始まらないことがあるため、
+        // HTTP層を通らないこの経路を第二の道として持つ
+        var triedBlob = false;
+        function tryBlobSrc() {
+          if (triedBlob || !offlineCapable()) return Promise.resolve(false);
+          triedBlob = true;
+          return caches.match(audioUrl).then(function (cached) {
+            if (!cached) return false;
+            return cached.blob().then(function (bl) {
+              var u = URL.createObjectURL(bl);
+              cleanups.push(function () { URL.revokeObjectURL(u); });
+              var keepT = audio.currentTime;
+              var wasPlaying = !audio.paused;
+              audio.src = u;
+              audio.load();
+              audio.addEventListener("loadedmetadata", function () {
+                if (keepT > 0) audio.currentTime = keepT;
+                if (wasPlaying) audio.play().catch(function () {});
+              }, { once: true });
+              return true;
+            });
+          }).catch(function () { return false; });
+        }
         audio.addEventListener("error", function () {
-          warn("音声を読み込めませんでした: " + audioName);
+          // 通常URLで読めなかった場合、保存済みならBlob経路で立て直す
+          tryBlobSrc().then(function (ok) {
+            if (!ok) warn("音声を読み込めませんでした: " + audioName);
+          });
         });
-        audio.src = base + encodeURIComponent(audioName);
+        if (!navigator.onLine) {
+          // 機内モード等: 最初からBlob経路を使う(保存が無ければ通常URLに任せて
+          // エラー表示につなげる)
+          tryBlobSrc().then(function (ok) {
+            if (!ok) audio.src = audioUrl;
+          });
+        } else {
+          audio.src = audioUrl;
+        }
       }
 
       var cues = (deck.cues || []).slice().sort(function (a, b) { return a.t - b.t; });
