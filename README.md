@@ -81,13 +81,22 @@ See [docker-compose.yml](docker-compose.yml) for the recommended hardened setup 
 
 kikimiru ships a web app manifest and a service worker: you can install it to your home
 screen / desktop, it launches full-screen with its own icon, and the library views keep
-working read-only when the server is unreachable (last-fetched snapshot). Two honest caveats:
+working read-only when the server is unreachable (last-fetched snapshot).
+
+**Offline listening (per-book).** Book detail has a "save offline" action that stores the
+whole book (audio, timing, text, cover and slide images) in the browser's cache. Saved
+books keep playing — including seeking, chapters and chapter export — with no server at
+all; the service worker synthesizes HTTP range responses from the stored audio. Downloads
+show deterministic progress and resume over flaky connections. Honest caveats:
 
 - Offline features require HTTPS (or `127.0.0.1`) — on plain-http LAN setups the service
   worker never activates. See [docs/DEPLOY.md](docs/DEPLOY.md) for easy TLS options.
+- Saved books are **not guaranteed to persist**: browsers may evict stored data under
+  pressure, and an uninstalled Safari tab can drop it after days of non-use. Installing to
+  the home screen makes storage much more durable; the UI tells you this once after your
+  first save.
 - iOS does not let web apps keep playing reliably from the lock screen after long pauses —
-  this is a WebKit platform limitation, not something a PWA can fix. Audio itself is never
-  cached offline.
+  this is a WebKit platform limitation, not something a PWA can fix.
 
 ## Security
 
@@ -104,8 +113,9 @@ working read-only when the server is unreachable (last-fetched snapshot). Two ho
 Phase 1 complete — library experience (multi-library, search, series/authors/tags, book
 detail), a fully rebuilt player (cover/slide views, chapter list, rotation fullscreen,
 desktop two-column layout, live-synced mini player, chapter export), password auth,
-cross-device progress sync, PWA, Docker/GHCR.
-Roadmap: offline book downloads, multi-user, native mobile apps.
+cross-device progress sync, PWA, Docker/GHCR. Per-book offline saving has landed
+(download, offline playback with seeking, delete).
+Roadmap: offline storage management UI, multi-user, native mobile apps.
 
 ## License
 
@@ -187,13 +197,20 @@ docker run -d -p 127.0.0.1:8484:8484 -v kikimiru-state:/state \
 
 manifest と Service Worker を同梱しており、ホーム画面/デスクトップへのインストール・
 アイコン付き全画面起動・サーバ停止時の読み取り専用表示(最後に取得した書棚)に対応します。
-正直な注意点が2つ:
+
+**ブック単位のオフライン保存。** ブック詳細の「オフライン保存」で、音声・タイミング・
+本文・表紙・画像スライドの一式をブラウザに保存できます。保存済みブックはサーバなしでも
+再生・シーク・チャプター・書き出しまで動きます(Service Worker が保存済み音声から
+Range応答を合成します)。ダウンロードは確定%表示で、不安定な回線でも途中から再開します。
+正直な注意点:
 
 - オフライン機能は HTTPS(または 127.0.0.1)でのみ動きます。LANのhttp運用では
   Service Worker は動きません([docs/DEPLOY.md](docs/DEPLOY.md) の簡単なTLS手引きを参照)
+- 保存の**永続は保証されません**。ブラウザは容量逼迫時に保存データを消すことがあり、
+  ホーム画面に追加していないSafariのタブ利用では数日の未使用で消えることがあります。
+  ホーム画面への追加で大幅に保たれやすくなります(初回保存後にUIが一度だけ案内します)
 - iOSでは長時間停止後のロック画面からの再生再開が失敗することがあります。これは
-  WebKitのプラットフォーム制約で、PWA側では解決できません。音声そのものは
-  オフライン保存しません
+  WebKitのプラットフォーム制約で、PWA側では解決できません
 
 ## セキュリティ
 
@@ -209,5 +226,6 @@ manifest と Service Worker を同梱しており、ホーム画面/デスクト
 Phase 1 完了 — ライブラリ体験(複数ライブラリ・検索・シリーズ/著者/タグ・ブック詳細)、
 プレイヤーの全面再構築(表紙/スライドの2表示・チャプター一覧・回転連動の全画面・
 デスクトップ2カラム・ライブ同期ミニプレイヤー・チャプター書き出し)、パスワード認証、
-端末間進捗同期、PWA、Docker/GHCR。
-ロードマップ: ブック単位のオフライン保存・マルチユーザー・ネイティブアプリ。
+端末間進捗同期、PWA、Docker/GHCR。ブック単位のオフライン保存が入りました
+(保存・オフライン再生/シーク・削除)。
+ロードマップ: オフライン保存の管理画面・マルチユーザー・ネイティブアプリ。
