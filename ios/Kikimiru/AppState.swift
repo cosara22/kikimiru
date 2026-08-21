@@ -48,6 +48,18 @@ final class AppState: ObservableObject {
                 phase = .shelf
                 return
             }
+            #if DEBUG
+            // SSH越しの自動受け入れ検証用(Debugビルド限定):
+            // simctl launch の環境変数からパスワードを受けて自動ログインする
+            if let pw = ProcessInfo.processInfo.environment["KIKIMIRU_DEBUG_PASSWORD"],
+               (try? await api.login(password: pw)) != nil,
+               (try? await loadLibraries(api)) != nil {
+                Keychain.savePassword(pw)
+                lastError = nil
+                phase = .shelf
+                return
+            }
+            #endif
             lastError = nil
             phase = .login
         } catch {
