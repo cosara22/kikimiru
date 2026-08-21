@@ -347,7 +347,9 @@ def valid_progress_key(key: str) -> bool:
     return len(parts) == 2 and all(is_safe_segment(p) for p in parts)
 
 
-def clean_progress_record(rec) -> dict | None:
+def clean_progress_record(rec) -> "dict | None":
+    # 注釈を文字列にしているのは Python 3.9 互換のため(X | Y 注釈は3.10+。
+    # macOS標準の python3 が 3.9 であり、実機で起動失敗することを確認済み)
     """進捗レコード {t,d,at,s?,n?} を型検証して正規化する。不正は None。"""
     if not isinstance(rec, dict):
         return None
