@@ -15,6 +15,8 @@ final class AppState: ObservableObject {
     @Published var libraries: [Library] = []
     @Published var currentLibrary: String = ""
     @Published var lastError: String?
+    /// プレイヤーシートで開いているブック(nilで閉)
+    @Published var playingBook: Book?
 
     init() {
         serverURLText = UserDefaults.standard.string(forKey: "kikimiru.serverURL") ?? ""
@@ -40,12 +42,14 @@ final class AppState: ObservableObject {
             try await loadLibraries(api)
             lastError = nil
             phase = .shelf
+            await debugAutoplayIfRequested(api)
         } catch APIError.authRequired {
             if let pw = Keychain.loadPassword(),
                (try? await api.login(password: pw)) != nil,
                (try? await loadLibraries(api)) != nil {
                 lastError = nil
                 phase = .shelf
+                await debugAutoplayIfRequested(api)
                 return
             }
             #if DEBUG
@@ -57,6 +61,7 @@ final class AppState: ObservableObject {
                 Keychain.savePassword(pw)
                 lastError = nil
                 phase = .shelf
+                await debugAutoplayIfRequested(api)
                 return
             }
             #endif
@@ -94,6 +99,19 @@ final class AppState: ObservableObject {
         if let api { await api.logout() }
         Keychain.deletePassword()
         phase = .login
+    }
+
+    /// SSH越しの自動受け入れ検証用(Debugビルド限定):
+    /// 環境変数のブックIDでプレイヤーを自動起動する
+    private func debugAutoplayIfRequested(_ api: APIClient) async {
+        #if DEBUG
+        guard playingBook == nil,
+              let id = ProcessInfo.processInfo.environment["KIKIMIRU_DEBUG_AUTOPLAY"],
+              !id.isEmpty else { return }
+        if let b = try? await api.book(id: id, library: currentLibrary) {
+            playingBook = b
+        }
+        #endif
     }
 
     private func loadLibraries(_ api: APIClient) async throws {

@@ -43,6 +43,31 @@ struct BookResponse: Codable {
     let book: Book
 }
 
+/// deck.json(構造データ。cuesが章送りとスライド同期の軸。v1/v2互換)
+struct Deck: Codable {
+    let kikimiru: Int?
+    let title: String?
+    let audio: AudioRef
+    let slides: [SlideRef]
+    let cues: [Cue]
+
+    struct AudioRef: Codable {
+        let src: String
+        let duration: Double?
+    }
+
+    struct SlideRef: Codable {
+        let id: String
+        let kind: String?
+        let image: String?
+    }
+
+    struct Cue: Codable {
+        let t: Double
+        let slide: String?
+    }
+}
+
 /// 再生進捗(サーバとLast-Write-Winsでマージする。atはミリ秒エポック)
 struct ProgressRecord: Codable, Hashable {
     var t: Double

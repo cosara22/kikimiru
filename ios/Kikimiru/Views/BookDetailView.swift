@@ -30,13 +30,12 @@ struct BookDetailView: View {
                 .foregroundStyle(.secondary)
 
                 Button {
-                    // G1: AVPlayer+ロック画面統合のプレイヤーを開く
+                    state.playingBook = book
                 } label: {
-                    Label("再生(G1で実装)", systemImage: "play.fill")
+                    Label("再生", systemImage: "play.fill")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(true)
 
                 if let desc = book.description, !desc.isEmpty {
                     Text(desc)
