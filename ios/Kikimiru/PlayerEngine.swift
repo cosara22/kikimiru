@@ -43,32 +43,55 @@ final class PlayerEngine: ObservableObject {
         saveProgress(push: true)
 
         let lib = book.library ?? ""
-        guard let deckURL = api.fileURL(library: lib, bookID: book.id, file: "deck.json") else {
-            throw APIError.invalidURL
-        }
-        let (data, resp) = try await URLSession.shared.data(from: deckURL)
-        if let http = resp as? HTTPURLResponse {
-            if http.statusCode == 401 { throw APIError.authRequired }
-            guard (200..<300).contains(http.statusCode) else { throw APIError.http(http.statusCode) }
+        // 保存済みならローカルファイルから読む(オフライン時も同じ経路で成立する)
+        let offline = OfflineStore.isDownloaded(library: lib, bookID: book.id)
+
+        let data: Data
+        if offline {
+            data = try Data(contentsOf: OfflineStore.fileURL(
+                library: lib, bookID: book.id, file: "deck.json"))
+        } else {
+            guard let deckURL = api.fileURL(library: lib, bookID: book.id, file: "deck.json") else {
+                throw APIError.invalidURL
+            }
+            let (d, resp) = try await URLSession.shared.data(from: deckURL)
+            if let http = resp as? HTTPURLResponse {
+                if http.statusCode == 401 { throw APIError.authRequired }
+                guard (200..<300).contains(http.statusCode) else {
+                    throw APIError.http(http.statusCode)
+                }
+            }
+            data = d
         }
         let deck = try JSONDecoder().decode(Deck.self, from: data)
 
         // content.json(本文)は任意ファイル。無くても再生は成立する
         var contentDoc: ContentDoc?
-        if let cURL = api.fileURL(library: lib, bookID: book.id, file: "content.json"),
-           let (cData, cResp) = try? await URLSession.shared.data(from: cURL),
-           (cResp as? HTTPURLResponse)?.statusCode == 200 {
+        if offline {
+            if let cData = try? Data(contentsOf: OfflineStore.fileURL(
+                library: lib, bookID: book.id, file: "content.json")) {
+                contentDoc = try? JSONDecoder().decode(ContentDoc.self, from: cData)
+            }
+        } else if let cURL = api.fileURL(library: lib, bookID: book.id, file: "content.json"),
+                  let (cData, cResp) = try? await URLSession.shared.data(from: cURL),
+                  (cResp as? HTTPURLResponse)?.statusCode == 200 {
             contentDoc = try? JSONDecoder().decode(ContentDoc.self, from: cData)
         }
 
-        guard let audioURL = api.fileURL(library: lib, bookID: book.id, file: deck.audio.src) else {
-            throw APIError.invalidURL
-        }
         unloadCurrent()
 
-        // AVPlayerは既定でCookieを送らないため、セッションCookieを明示的に渡す
-        let cookies = HTTPCookieStorage.shared.cookies(for: audioURL) ?? []
-        let asset = AVURLAsset(url: audioURL, options: [AVURLAssetHTTPCookiesKey: cookies])
+        let asset: AVURLAsset
+        if offline {
+            asset = AVURLAsset(url: OfflineStore.fileURL(
+                library: lib, bookID: book.id, file: deck.audio.src))
+        } else {
+            guard let audioURL = api.fileURL(library: lib, bookID: book.id, file: deck.audio.src) else {
+                throw APIError.invalidURL
+            }
+            // AVPlayerは既定でCookieを送らないため、セッションCookieを明示的に渡す
+            let cookies = HTTPCookieStorage.shared.cookies(for: audioURL) ?? []
+            asset = AVURLAsset(url: audioURL, options: [AVURLAssetHTTPCookiesKey: cookies])
+        }
         let item = AVPlayerItem(asset: asset)
         let newPlayer = AVPlayer(playerItem: item)
 
@@ -347,11 +370,17 @@ final class PlayerEngine: ObservableObject {
     }
 
     private func loadArtwork(api: APIClient) async {
-        guard let book, let cover = book.cover,
-              let u = api.fileURL(library: book.library ?? "", bookID: book.id, file: cover) else {
-            return
+        guard let book, let cover = book.cover, !cover.isEmpty else { return }
+        let lib = book.library ?? ""
+        var imgData: Data?
+        if OfflineStore.isDownloaded(library: lib, bookID: book.id) {
+            imgData = try? Data(contentsOf: OfflineStore.fileURL(
+                library: lib, bookID: book.id, file: cover))
         }
-        guard let (data, _) = try? await URLSession.shared.data(from: u),
+        if imgData == nil, let u = api.fileURL(library: lib, bookID: book.id, file: cover) {
+            imgData = try? await URLSession.shared.data(from: u).0
+        }
+        guard let data = imgData,
               let img = UIImage(data: data) else { return }
         let art = MPMediaItemArtwork(boundsSize: img.size) { _ in img }
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]

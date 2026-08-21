@@ -1,7 +1,18 @@
 import SwiftUI
+import UIKit
+
+/// バックグラウンドDLの完了イベント受け口(アプリがOSに再起動されて呼ばれる)
+final class AppDelegate: NSObject, UIApplicationDelegate {
+    func application(_ application: UIApplication,
+                     handleEventsForBackgroundURLSession identifier: String,
+                     completionHandler: @escaping () -> Void) {
+        DownloadManager.shared.backgroundCompletionHandler = completionHandler
+    }
+}
 
 @main
 struct KikimiruApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var state = AppState()
     @Environment(\.scenePhase) private var scenePhase
 

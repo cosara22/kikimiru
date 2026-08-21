@@ -17,6 +17,8 @@ final class AppState: ObservableObject {
     @Published var lastError: String?
     /// プレイヤーシートで開いているブック(nilで閉)
     @Published var playingBook: Book?
+    /// サーバ不達で保存済みブックだけを表示している状態
+    @Published var offlineMode = false
 
     init() {
         serverURLText = UserDefaults.standard.string(forKey: "kikimiru.serverURL") ?? ""
@@ -43,7 +45,7 @@ final class AppState: ObservableObject {
             lastError = nil
             phase = .shelf
             await ProgressSync.shared.sync(api: api)
-            await debugAutoplayIfRequested(api)
+            await debugHooksIfRequested(api)
         } catch APIError.authRequired {
             if let pw = Keychain.loadPassword(),
                (try? await api.login(password: pw)) != nil,
@@ -51,7 +53,7 @@ final class AppState: ObservableObject {
                 lastError = nil
                 phase = .shelf
                 await ProgressSync.shared.sync(api: api)
-                await debugAutoplayIfRequested(api)
+                await debugHooksIfRequested(api)
                 return
             }
             #if DEBUG
@@ -64,13 +66,22 @@ final class AppState: ObservableObject {
                 lastError = nil
                 phase = .shelf
                 await ProgressSync.shared.sync(api: api)
-                await debugAutoplayIfRequested(api)
+                await debugHooksIfRequested(api)
                 return
             }
             #endif
             lastError = nil
             phase = .login
         } catch {
+            // サーバ不達でも保存済みブックがあればオフライン書棚で起動する
+            let saved = OfflineStore.listDownloaded()
+            if !saved.isEmpty {
+                offlineMode = true
+                lastError = nil
+                phase = .shelf
+                debugAutoplayOffline(saved)
+                return
+            }
             lastError = error.localizedDescription
             phase = .setup
         }
@@ -105,16 +116,31 @@ final class AppState: ObservableObject {
         phase = .login
     }
 
-    /// SSH越しの自動受け入れ検証用(Debugビルド限定):
-    /// 環境変数のブックIDでプレイヤーを自動起動する
-    private func debugAutoplayIfRequested(_ api: APIClient) async {
+    /// SSH越しの自動受け入れ検証用フック(Debugビルド限定)
+    private func debugHooksIfRequested(_ api: APIClient) async {
+        #if DEBUG
+        offlineMode = false
+        let env = ProcessInfo.processInfo.environment
+        if playingBook == nil, let id = env["KIKIMIRU_DEBUG_AUTOPLAY"], !id.isEmpty,
+           let b = try? await api.book(id: id, library: currentLibrary) {
+            playingBook = b
+        }
+        if let id = env["KIKIMIRU_DEBUG_DOWNLOAD"], !id.isEmpty,
+           let b = try? await api.book(id: id, library: currentLibrary) {
+            DownloadManager.shared.enqueue(book: b, api: api)
+        }
+        #else
+        offlineMode = false
+        #endif
+    }
+
+    /// オフライン起動時の自動再生(Debugビルド限定・保存済みブックから探す)
+    private func debugAutoplayOffline(_ saved: [Book]) {
         #if DEBUG
         guard playingBook == nil,
               let id = ProcessInfo.processInfo.environment["KIKIMIRU_DEBUG_AUTOPLAY"],
-              !id.isEmpty else { return }
-        if let b = try? await api.book(id: id, library: currentLibrary) {
-            playingBook = b
-        }
+              let b = saved.first(where: { $0.id == id }) else { return }
+        playingBook = b
         #endif
     }
 

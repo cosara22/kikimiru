@@ -30,7 +30,7 @@ struct LibraryView: View {
                     }
                 }
             }
-            .navigationTitle("本棚")
+            .navigationTitle(state.offlineMode ? "本棚(オフライン)" : "本棚")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -52,6 +52,15 @@ struct LibraryView: View {
     }
 
     private func reload() async {
+        // オフライン起動時は保存済みブックだけを一覧する(検索はローカル絞り込み)
+        if state.offlineMode {
+            let saved = OfflineStore.listDownloaded()
+            books = query.isEmpty ? saved : saved.filter {
+                $0.title.localizedCaseInsensitiveContains(query)
+            }
+            errorText = nil
+            return
+        }
         guard let api = state.api, !state.currentLibrary.isEmpty else { return }
         loading = true
         defer { loading = false }
@@ -86,16 +95,26 @@ struct BookRow: View {
     }
 }
 
-/// カバー画像。セッションCookieはURLSessionの共有Cookieストレージから自動で付く
+/// カバー画像。保存済みならローカルファイル、それ以外はサーバから取得する
+/// (セッションCookieはURLSessionの共有Cookieストレージから自動で付く)
 struct CoverImage: View {
     @EnvironmentObject var state: AppState
     let book: Book
 
+    private var coverURL: URL? {
+        guard let cover = book.cover, !cover.isEmpty else { return nil }
+        let lib = book.library ?? state.currentLibrary
+        if OfflineStore.isDownloaded(library: lib, bookID: book.id) {
+            let local = OfflineStore.fileURL(library: lib, bookID: book.id, file: cover)
+            if FileManager.default.fileExists(atPath: local.path) {
+                return local
+            }
+        }
+        return state.api?.fileURL(library: lib, bookID: book.id, file: cover)
+    }
+
     var body: some View {
-        if let cover = book.cover,
-           let api = state.api,
-           let u = api.fileURL(library: book.library ?? state.currentLibrary,
-                               bookID: book.id, file: cover) {
+        if let u = coverURL {
             AsyncImage(url: u) { img in
                 img.resizable().aspectRatio(contentMode: .fill)
             } placeholder: {
