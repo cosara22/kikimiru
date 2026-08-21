@@ -21,9 +21,11 @@ final class PlayerEngine: ObservableObject {
     @Published private(set) var rate: Double = 1.0
 
     private var player: AVPlayer?
+    private var api: APIClient?
     private var timeObserver: Any?
     private var endObserver: NSObjectProtocol?
     private var commandsConfigured = false
+    private var lastProgressSaveAt = Date.distantPast
 
     private init() {
         rate = UserDefaults.standard.object(forKey: "kikimiru.rate") as? Double ?? 1.0
@@ -37,6 +39,8 @@ final class PlayerEngine: ObservableObject {
     func load(book: Book, api: APIClient) async throws {
         // 同じブックなら読み込み直さない(ビューを開き直しても再生を継続)
         if self.book?.id == book.id, player != nil { return }
+        // 別のブックへ切り替える前に、いまの位置を保存してアップする
+        saveProgress(push: true)
 
         let lib = book.library ?? ""
         guard let deckURL = api.fileURL(library: lib, bookID: book.id, file: "deck.json") else {
@@ -70,6 +74,7 @@ final class PlayerEngine: ObservableObject {
 
         newPlayer.defaultRate = Float(rate)
         self.player = newPlayer
+        self.api = api
         self.book = book
         self.deck = deck
         self.content = contentDoc
@@ -90,6 +95,12 @@ final class PlayerEngine: ObservableObject {
             forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main
         ) { _ in
             Task { @MainActor in PlayerEngine.shared.handleEnded() }
+        }
+
+        // 続きから: 保存済み進捗があれば冒頭・末尾ぎわを除いて復元する
+        if let rec = ProgressSync.shared.record(library: lib, bookID: book.id),
+           rec.t > 3, duration <= 0 || rec.t < duration - 3 {
+            seek(to: rec.t)
         }
 
         configureRemoteCommands()
@@ -143,6 +154,12 @@ final class PlayerEngine: ObservableObject {
         player?.pause()
         isPlaying = false
         updateNowPlayingDynamic()
+        saveProgress(push: true)
+    }
+
+    /// バックグラウンド移行時などに現在位置を確定保存する
+    func flushProgress() {
+        saveProgress(push: true)
     }
 
     func toggle() {
@@ -199,12 +216,29 @@ final class PlayerEngine: ObservableObject {
         if i != currentCue {
             currentCue = i
         }
+        // 再生中は5秒ごとに位置を保存する(書き込み過多を避ける間引き。Web版と同じ)
+        if isPlaying, Date().timeIntervalSince(lastProgressSaveAt) >= 5 {
+            lastProgressSaveAt = Date()
+            saveProgress(push: true)
+        }
+    }
+
+    private func saveProgress(push: Bool) {
+        guard let book, currentTime > 0 else { return }
+        ProgressSync.shared.save(
+            library: book.library ?? "", bookID: book.id,
+            t: currentTime, d: duration,
+            cue: currentCue, total: cues.count)
+        if push, let api {
+            ProgressSync.shared.pushDirtyLater(api: api)
+        }
     }
 
     private func handleEnded() {
         isPlaying = false
         currentTime = duration
         updateNowPlayingDynamic()
+        saveProgress(push: true)
     }
 
     // ---- 割り込み(着信・イヤホン抜き) ----

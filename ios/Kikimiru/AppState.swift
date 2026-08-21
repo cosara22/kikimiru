@@ -34,7 +34,7 @@ final class AppState: ObservableObject {
     func bootstrap() async {
         guard !serverURLText.isEmpty else { phase = .setup; return }
         guard let api else {
-            lastError = "サーバURLが不正です(例: http://192.168.1.10:8000)"
+            lastError = "サーバURLが不正です(例: http://192.168.1.10:8484)"
             phase = .setup
             return
         }
@@ -42,6 +42,7 @@ final class AppState: ObservableObject {
             try await loadLibraries(api)
             lastError = nil
             phase = .shelf
+            await ProgressSync.shared.sync(api: api)
             await debugAutoplayIfRequested(api)
         } catch APIError.authRequired {
             if let pw = Keychain.loadPassword(),
@@ -49,6 +50,7 @@ final class AppState: ObservableObject {
                (try? await loadLibraries(api)) != nil {
                 lastError = nil
                 phase = .shelf
+                await ProgressSync.shared.sync(api: api)
                 await debugAutoplayIfRequested(api)
                 return
             }
@@ -61,6 +63,7 @@ final class AppState: ObservableObject {
                 Keychain.savePassword(pw)
                 lastError = nil
                 phase = .shelf
+                await ProgressSync.shared.sync(api: api)
                 await debugAutoplayIfRequested(api)
                 return
             }
@@ -88,6 +91,7 @@ final class AppState: ObservableObject {
             try await loadLibraries(api)
             lastError = nil
             phase = .shelf
+            await ProgressSync.shared.sync(api: api)
         } catch APIError.authRequired {
             lastError = "パスワードが違います"
         } catch {
