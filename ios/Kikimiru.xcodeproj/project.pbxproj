@@ -6,9 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A1000000000000000000B025 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A1000000000000000000B00A /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A1000000000000000000B005;
+			remoteInfo = Kikimiru;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		A1000000000000000000B004 /* Kikimiru.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Kikimiru.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000000000000000000B00C /* Kikimiru-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Kikimiru-Info.plist"; sourceTree = "<group>"; };
+		A1000000000000000000B024 /* KikimiruTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KikimiruTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -17,10 +28,22 @@
 			path = Kikimiru;
 			sourceTree = "<group>";
 		};
+		A1000000000000000000B021 /* KikimiruTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KikimiruTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1000000000000000000B008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000B028 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -34,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000B001 /* Kikimiru */,
+				A1000000000000000000B021 /* KikimiruTests */,
 				A1000000000000000000B00C /* Kikimiru-Info.plist */,
 				A1000000000000000000B003 /* Products */,
 			);
@@ -43,6 +67,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000000000000000000B004 /* Kikimiru.app */,
+				A1000000000000000000B024 /* KikimiruTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -72,7 +97,37 @@
 			productReference = A1000000000000000000B004 /* Kikimiru.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1000000000000000000B022 /* KikimiruTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000B023 /* Build configuration list for PBXNativeTarget "KikimiruTests" */;
+			buildPhases = (
+				A1000000000000000000B027 /* Sources */,
+				A1000000000000000000B028 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A1000000000000000000B026 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A1000000000000000000B021 /* KikimiruTests */,
+			);
+			name = KikimiruTests;
+			packageProductDependencies = (
+			);
+			productName = KikimiruTests;
+			productReference = A1000000000000000000B024 /* KikimiruTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		A1000000000000000000B026 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A1000000000000000000B005 /* Kikimiru */;
+			targetProxy = A1000000000000000000B025 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		A1000000000000000000B00A /* Project object */ = {
@@ -84,6 +139,10 @@
 				TargetAttributes = {
 					A1000000000000000000B005 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					A1000000000000000000B022 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A1000000000000000000B005;
 					};
 				};
 			};
@@ -103,6 +162,7 @@
 			projectRoot = "";
 			targets = (
 				A1000000000000000000B005 /* Kikimiru */,
+				A1000000000000000000B022 /* KikimiruTests */,
 			);
 		};
 /* End PBXProject section */
@@ -119,6 +179,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		A1000000000000000000B007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1000000000000000000B027 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -234,6 +301,42 @@
 			};
 			name = Release;
 		};
+		A1000000000000000000B030 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "app.kikimiru.ios.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kikimiru.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kikimiru";
+			};
+			name = Debug;
+		};
+		A1000000000000000000B031 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "app.kikimiru.ios.tests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Kikimiru.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Kikimiru";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -242,6 +345,15 @@
 			buildConfigurations = (
 				A1000000000000000000B012 /* Debug */,
 				A1000000000000000000B013 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000B023 /* Build configuration list for PBXNativeTarget "KikimiruTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000B030 /* Debug */,
+				A1000000000000000000B031 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

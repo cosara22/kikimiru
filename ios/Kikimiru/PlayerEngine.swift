@@ -206,11 +206,7 @@ final class PlayerEngine: ObservableObject {
     // ---- 章送り(cuesが章) ----
 
     private func cueIndex(at t: Double) -> Int {
-        var idx = 0
-        for (i, c) in cues.enumerated() where c.t <= t + 0.05 {
-            idx = i
-        }
-        return idx
+        SyncLogic.cueIndex(cues: cues, at: t)
     }
 
     func nextChapter() {

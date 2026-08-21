@@ -48,22 +48,10 @@ final class ProgressSync {
     func sync(api: APIClient) async {
         do {
             let server = try await api.progress()
-            for (key, rec) in server {
-                if let local = records[key] {
-                    if rec.at > local.at {
-                        records[key] = rec
-                        dirty.remove(key)
-                    } else if local.at > rec.at {
-                        dirty.insert(key)
-                    }
-                } else {
-                    records[key] = rec
-                }
-            }
-            // サーバ側に無いローカル分もアップ対象にする
-            for key in records.keys where server[key] == nil {
-                dirty.insert(key)
-            }
+            let merged = SyncLogic.mergeProgress(local: records, localDirty: dirty,
+                                                 server: server)
+            records = merged.records
+            dirty = merged.dirty
             persist()
             try await pushDirty(api: api)
         } catch {
