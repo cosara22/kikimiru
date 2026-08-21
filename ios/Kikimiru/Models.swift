@@ -68,6 +68,19 @@ struct Deck: Codable {
     }
 }
 
+/// content.json(本文データ。スライドidごとのテキスト面。ファイル自体が任意)
+struct ContentDoc: Codable {
+    let kikimiru: Int?
+    let slides: [String: SlideText]
+
+    struct SlideText: Codable {
+        let title: String?
+        let bullets: [String]?
+        let note: String?
+        let alt: String?
+    }
+}
+
 /// 再生進捗(サーバとLast-Write-Winsでマージする。atはミリ秒エポック)
 struct ProgressRecord: Codable, Hashable {
     var t: Double

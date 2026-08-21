@@ -13,10 +13,12 @@ final class PlayerEngine: ObservableObject {
 
     @Published private(set) var book: Book?
     @Published private(set) var deck: Deck?
+    @Published private(set) var content: ContentDoc?
     @Published private(set) var isPlaying = false
     @Published private(set) var currentTime: Double = 0
     @Published private(set) var duration: Double = 0
     @Published private(set) var currentCue = 0
+    @Published private(set) var rate: Double = 1.0
 
     private var player: AVPlayer?
     private var timeObserver: Any?
@@ -24,6 +26,7 @@ final class PlayerEngine: ObservableObject {
     private var commandsConfigured = false
 
     private init() {
+        rate = UserDefaults.standard.object(forKey: "kikimiru.rate") as? Double ?? 1.0
         observeInterruptions()
     }
 
@@ -46,6 +49,14 @@ final class PlayerEngine: ObservableObject {
         }
         let deck = try JSONDecoder().decode(Deck.self, from: data)
 
+        // content.json(本文)は任意ファイル。無くても再生は成立する
+        var contentDoc: ContentDoc?
+        if let cURL = api.fileURL(library: lib, bookID: book.id, file: "content.json"),
+           let (cData, cResp) = try? await URLSession.shared.data(from: cURL),
+           (cResp as? HTTPURLResponse)?.statusCode == 200 {
+            contentDoc = try? JSONDecoder().decode(ContentDoc.self, from: cData)
+        }
+
         guard let audioURL = api.fileURL(library: lib, bookID: book.id, file: deck.audio.src) else {
             throw APIError.invalidURL
         }
@@ -57,9 +68,11 @@ final class PlayerEngine: ObservableObject {
         let item = AVPlayerItem(asset: asset)
         let newPlayer = AVPlayer(playerItem: item)
 
+        newPlayer.defaultRate = Float(rate)
         self.player = newPlayer
         self.book = book
         self.deck = deck
+        self.content = contentDoc
         self.currentTime = 0
         self.currentCue = 0
         self.duration = deck.audio.duration ?? 0
@@ -110,7 +123,19 @@ final class PlayerEngine: ObservableObject {
             // セッション構成に失敗しても再生自体は試みる
         }
         player.play()
+        player.rate = Float(rate)
         isPlaying = true
+        updateNowPlayingDynamic()
+    }
+
+    /// 再生速度(選択は端末に記憶し、次のブックにも引き継ぐ)
+    func setRate(_ r: Double) {
+        rate = r
+        UserDefaults.standard.set(r, forKey: "kikimiru.rate")
+        player?.defaultRate = Float(r)
+        if isPlaying {
+            player?.rate = Float(r)
+        }
         updateNowPlayingDynamic()
     }
 
@@ -282,7 +307,7 @@ final class PlayerEngine: ObservableObject {
     private func updateNowPlayingDynamic() {
         var info = MPNowPlayingInfoCenter.default().nowPlayingInfo ?? [:]
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = currentTime
-        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? 1.0 : 0.0
+        info[MPNowPlayingInfoPropertyPlaybackRate] = isPlaying ? rate : 0.0
         info[MPMediaItemPropertyPlaybackDuration] = duration
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
