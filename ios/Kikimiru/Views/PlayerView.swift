@@ -112,9 +112,16 @@ struct PlayerView: View {
     }
 
     private var currentSlideImageURL: URL? {
-        guard let image = currentSlideRef?.image, let api = state.api else { return nil }
-        return api.fileURL(library: book.library ?? state.currentLibrary,
-                           bookID: book.id, file: image)
+        guard let image = currentSlideRef?.image, !image.isEmpty else { return nil }
+        let lib = book.library ?? state.currentLibrary
+        // 保存済みならローカルファイルを優先(オフラインでも画像スライドが出る)
+        if OfflineStore.isDownloaded(library: lib, bookID: book.id) {
+            let local = OfflineStore.fileURL(library: lib, bookID: book.id, file: image)
+            if FileManager.default.fileExists(atPath: local.path) {
+                return local
+            }
+        }
+        return state.api?.fileURL(library: lib, bookID: book.id, file: image)
     }
 
     // ---- 速度 ----
